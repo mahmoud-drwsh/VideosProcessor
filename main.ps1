@@ -94,7 +94,7 @@ function Show-TitleConfirmationDialog {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Confirm Title"
-    $form.Size = New-Object System.Drawing.Size(420, 200)
+    $form.Size = New-Object System.Drawing.Size(420, 220)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
@@ -108,42 +108,50 @@ function Show-TitleConfirmationDialog {
     $lblTitleCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
     $form.Controls.Add($lblTitleCaption)
 
-    $lblTitle = New-Object System.Windows.Forms.Label
-    $lblTitle.Text = $TitleText
-    $lblTitle.Location = New-Object System.Drawing.Point(20, 42)
-    $lblTitle.Size = New-Object System.Drawing.Size(360, 40)
-    $lblTitle.AutoSize = $false
-    $lblTitle.MaximumSize = New-Object System.Drawing.Size(360, 0)
-    $lblTitle.AutoEllipsis = $false
-    $lblTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-    $form.Controls.Add($lblTitle)
+    # Use ReadOnly TextBox so RTL text displays and wraps reliably (Label had display issues with RTL)
+    $txtTitle = New-Object System.Windows.Forms.TextBox
+    $txtTitle.Text = $TitleText
+    $txtTitle.Location = New-Object System.Drawing.Point(20, 42)
+    $txtTitle.Size = New-Object System.Drawing.Size(360, 44)
+    $txtTitle.Multiline = $true
+    $txtTitle.ReadOnly = $true
+    $txtTitle.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    $txtTitle.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $txtTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $txtTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $txtTitle.BackColor = [System.Drawing.SystemColors]::Window
+    $form.Controls.Add($txtTitle)
 
     $lblArtistCaption = New-Object System.Windows.Forms.Label
     $lblArtistCaption.Text = "الفنان:"
-    $lblArtistCaption.Location = New-Object System.Drawing.Point(20, 88)
+    $lblArtistCaption.Location = New-Object System.Drawing.Point(20, 92)
     $lblArtistCaption.AutoSize = $true
     $lblArtistCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
     $form.Controls.Add($lblArtistCaption)
 
-    $lblArtist = New-Object System.Windows.Forms.Label
-    $lblArtist.Text = $ArtistText
-    $lblArtist.Location = New-Object System.Drawing.Point(20, 108)
-    $lblArtist.Size = New-Object System.Drawing.Size(360, 24)
-    $lblArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $form.Controls.Add($lblArtist)
+    $txtArtist = New-Object System.Windows.Forms.TextBox
+    $txtArtist.Text = $ArtistText
+    $txtArtist.Location = New-Object System.Drawing.Point(20, 112)
+    $txtArtist.Size = New-Object System.Drawing.Size(360, 28)
+    $txtArtist.Multiline = $true
+    $txtArtist.ReadOnly = $true
+    $txtArtist.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    $txtArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $txtArtist.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $txtArtist.BackColor = [System.Drawing.SystemColors]::Window
+    $form.Controls.Add($txtArtist)
 
     $btnOK = New-Object System.Windows.Forms.Button
     $btnOK.Text = "موافق"
     $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $btnOK.Location = New-Object System.Drawing.Point(220, 140)
+    $btnOK.Location = New-Object System.Drawing.Point(220, 168)
     $form.AcceptButton = $btnOK
     $form.Controls.Add($btnOK)
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text = "إلغاء"
     $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    $btnCancel.Location = New-Object System.Drawing.Point(120, 140)
+    $btnCancel.Location = New-Object System.Drawing.Point(120, 168)
     $form.CancelButton = $btnCancel
     $form.Controls.Add($btnCancel)
 
