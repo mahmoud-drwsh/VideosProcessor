@@ -199,7 +199,10 @@ using System.Runtime.InteropServices;
 [ComVisible(true)]
 public class VideoChoiceCallback {
     public static int? Result;
-    public void Choose(int index) { Result = index; }
+    public void Choose(object indexObj) {
+        if (indexObj == null) return;
+        try { Result = Convert.ToInt32(indexObj); } catch { }
+    }
 }
 '@
     try { Add-Type -TypeDefinition $videoChoiceSource } catch { }
