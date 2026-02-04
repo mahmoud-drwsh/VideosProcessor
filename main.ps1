@@ -55,95 +55,28 @@ function Show-FileSelector {
         [string]$InitialDirectory
     )
 
+    # Load the required .NET assembly
     Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
 
-    $folder = $InitialDirectory
-    if (-not $folder -or -not (Test-Path $folder)) {
-        $folder = [Environment]::GetFolderPath("MyDocuments")
+    $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+    $openFileDialog.Title = "Select a Video File"
+    $openFileDialog.Filter = "Video Files|*.mp4;*.mkv;*.mov;*.avi;*.flv;*.obs|All Files|*.*"
+
+    if ($InitialDirectory -and (Test-Path $InitialDirectory)) {
+        $openFileDialog.InitialDirectory = $InitialDirectory
+    } else {
+        $openFileDialog.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")
     }
 
-    $videoExtensions = @('.mp4', '.mkv', '.mov', '.avi', '.flv', '.obs')
-    $files = @(Get-ChildItem -Path $folder -File -ErrorAction SilentlyContinue |
-        Where-Object { $videoExtensions -contains $_.Extension } |
-        Sort-Object LastWriteTime -Descending)
+    # Optional: Allow selecting multiple files? (Set to $false for single file)
+    $openFileDialog.Multiselect = $false
 
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Select a Video File"
-    $form.Size = New-Object System.Drawing.Size(620, 420)
-    $form.StartPosition = "CenterScreen"
-    $form.FormBorderStyle = "FixedDialog"
-    $form.MinimumSize = New-Object System.Drawing.Size(400, 300)
-
-    $listView = New-Object System.Windows.Forms.ListView
-    $listView.View = [System.Windows.Forms.View]::Details
-    $listView.FullRowSelect = $true
-    $listView.GridLines = $true
-    $listView.Dock = [System.Windows.Forms.DockStyle]::Fill
-    $listView.Columns.Add("Name", 320) | Out-Null
-    $listView.Columns.Add("Date Modified", 130) | Out-Null
-    $listView.Columns.Add("Size", 90) | Out-Null
-
-    foreach ($f in $files) {
-        $sizeStr = if ($f.Length -ge 1GB) { "{0:N2} GB" -f ($f.Length / 1GB) }
-        elseif ($f.Length -ge 1MB) { "{0:N2} MB" -f ($f.Length / 1MB) }
-        elseif ($f.Length -ge 1KB) { "{0:N2} KB" -f ($f.Length / 1KB) }
-        else { "$($f.Length) B" }
-        $item = New-Object System.Windows.Forms.ListViewItem($f.Name)
-        $item.SubItems.Add($f.LastWriteTime.ToString("yyyy-MM-dd HH:mm")) | Out-Null
-        $item.SubItems.Add($sizeStr) | Out-Null
-        $item.Tag = $f.FullName
-        $listView.Items.Add($item) | Out-Null
+    # Show the dialog. If user clicks OK, return the path.
+    if ($openFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $openFileDialog.FileName
     }
 
-    $form.Controls.Add($listView)
-
-    $panel = New-Object System.Windows.Forms.Panel
-    $panel.Height = 44
-    $panel.Dock = [System.Windows.Forms.DockStyle]::Bottom
-    $panel.Padding = New-Object System.Windows.Forms.Padding(8, 6)
-
-    $btnOpen = New-Object System.Windows.Forms.Button
-    $btnOpen.Text = "Open"
-    $btnOpen.Size = New-Object System.Drawing.Size(88, 28)
-    $btnOpen.Location = New-Object System.Drawing.Point(8, 8)
-    $btnOpen.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $form.AcceptButton = $btnOpen
-
-    $btnCancel = New-Object System.Windows.Forms.Button
-    $btnCancel.Text = "Cancel"
-    $btnCancel.Size = New-Object System.Drawing.Size(88, 28)
-    $btnCancel.Location = New-Object System.Drawing.Point(102, 8)
-    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    $form.CancelButton = $btnCancel
-
-    $labelFolder = New-Object System.Windows.Forms.Label
-    $labelFolder.Text = "Look in: " + $folder
-    $labelFolder.AutoSize = $true
-    $labelFolder.Location = New-Object System.Drawing.Point(200, 14)
-    $labelFolder.MaximumSize = New-Object System.Drawing.Size(400, 0)
-
-    $panel.Controls.Add($btnOpen)
-    $panel.Controls.Add($btnCancel)
-    $panel.Controls.Add($labelFolder)
-    $form.Controls.Add($panel)
-
-    $script:selectedPath = $null
-    $listView.Add_DoubleClick({
-        if ($listView.SelectedItems.Count -gt 0) {
-            $script:selectedPath = $listView.SelectedItems[0].Tag
-            $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
-            $form.Close()
-        }
-    })
-    $form.Add_FormClosing({
-        if ($form.DialogResult -eq [System.Windows.Forms.DialogResult]::OK -and $listView.SelectedItems.Count -gt 0) {
-            $script:selectedPath = $listView.SelectedItems[0].Tag
-        }
-    })
-
-    $null = $form.ShowDialog()
-    return $script:selectedPath
+    return $null
 }
 
 # Escape text for safe use inside HTML (prevents XSS and broken markup).
