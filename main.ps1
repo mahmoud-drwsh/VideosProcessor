@@ -78,6 +78,75 @@ function Show-FileSelector {
     return $null
 }
 
+# Show RTL-friendly confirmation dialog for title and album artist. Returns $true if OK, $false if Cancel/closed.
+function Show-TitleConfirmationDialog {
+    param(
+        [string]$TitleText,
+        [string]$ArtistText
+    )
+
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Confirm Title"
+    $form.Size = New-Object System.Drawing.Size(420, 200)
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.RightToLeftLayout = $true
+    $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+
+    $lblTitleCaption = New-Object System.Windows.Forms.Label
+    $lblTitleCaption.Text = "العنوان:"
+    $lblTitleCaption.Location = New-Object System.Drawing.Point(20, 20)
+    $lblTitleCaption.AutoSize = $true
+    $lblTitleCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.Controls.Add($lblTitleCaption)
+
+    $lblTitle = New-Object System.Windows.Forms.Label
+    $lblTitle.Text = $TitleText
+    $lblTitle.Location = New-Object System.Drawing.Point(20, 42)
+    $lblTitle.Size = New-Object System.Drawing.Size(360, 40)
+    $lblTitle.AutoSize = $false
+    $lblTitle.MaximumSize = New-Object System.Drawing.Size(360, 0)
+    $lblTitle.AutoEllipsis = $false
+    $lblTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $form.Controls.Add($lblTitle)
+
+    $lblArtistCaption = New-Object System.Windows.Forms.Label
+    $lblArtistCaption.Text = "الفنان:"
+    $lblArtistCaption.Location = New-Object System.Drawing.Point(20, 88)
+    $lblArtistCaption.AutoSize = $true
+    $lblArtistCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.Controls.Add($lblArtistCaption)
+
+    $lblArtist = New-Object System.Windows.Forms.Label
+    $lblArtist.Text = $ArtistText
+    $lblArtist.Location = New-Object System.Drawing.Point(20, 108)
+    $lblArtist.Size = New-Object System.Drawing.Size(360, 24)
+    $lblArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.Controls.Add($lblArtist)
+
+    $btnOK = New-Object System.Windows.Forms.Button
+    $btnOK.Text = "موافق"
+    $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $btnOK.Location = New-Object System.Drawing.Point(220, 140)
+    $form.AcceptButton = $btnOK
+    $form.Controls.Add($btnOK)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "إلغاء"
+    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $btnCancel.Location = New-Object System.Drawing.Point(120, 140)
+    $form.CancelButton = $btnCancel
+    $form.Controls.Add($btnCancel)
+
+    $result = $form.ShowDialog()
+    return ($result -eq [System.Windows.Forms.DialogResult]::OK)
+}
+
 # Get average FPS for the first video stream using ffprobe.
 function Get-VideoFps($filePath) {
     # avg_frame_rate is typically like "30000/1001" or "30/1"
@@ -117,20 +186,18 @@ while ($true) {
     if (Test-Path $titleFilePath) {
         # Read file as an array of lines
         $lines = Get-Content $titleFilePath -Encoding UTF8
-        Write-Host "  > Raw title file lines (RTL):" -ForegroundColor DarkCyan
-        $lines | ForEach-Object { Write-Host ("    '" + (Convert-ToRtl $_) + "'") }
-
         # Filter out empty lines just in case
         $validLines = $lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        Write-Host "  > Valid (non-empty) lines (RTL):" -ForegroundColor DarkCyan
-        $validLines | ForEach-Object { Write-Host ("    '" + (Convert-ToRtl $_) + "'") }
 
         if ($validLines.Count -ge 2) {
             $cleanTitle  = $validLines[0].Trim() # Line 1: Filename part
             $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
-            Write-Host ("  > Parsed cleanTitle : '"  + (Convert-ToRtl $cleanTitle)  + "'") -ForegroundColor Green
-            Write-Host ("  > Parsed albumArtist: '" + (Convert-ToRtl $albumArtist) + "'") -ForegroundColor Green
-            break # Found both lines, proceed
+            Write-Host "Title file OK. Showing confirmation..." -ForegroundColor Cyan
+            $confirmed = Show-TitleConfirmationDialog -TitleText $cleanTitle -ArtistText $albumArtist
+            if (-not $confirmed) {
+                exit 0
+            }
+            break # Found both lines and user confirmed, proceed
         }
     }
     Write-Host "Waiting for 2 lines in $titleFilePath..." -ForegroundColor Yellow
