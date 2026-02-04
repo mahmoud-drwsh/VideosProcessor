@@ -25,8 +25,8 @@ if (-not (Test-Path $destAudio)) { New-Item -ItemType Directory -Path $destAudio
 # --- FFmpeg Command Builders ---
 
 function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) {
-    # -map 0:a:0 = use only first audio stream (video is never decoded)
-    return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    # -map 0:a:0 = use only first audio stream (video is never decoded); -application voip = tuned for speech/lectures
+    return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
     # H.265/HEVC 480p via libx265; CRF 24 = good quality, preset medium = balance of speed/size
