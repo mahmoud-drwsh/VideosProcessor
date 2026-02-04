@@ -290,7 +290,6 @@ if (-not $debugProgram) {
     if (-not (Test-Path $dailyFolder)) {
         New-Item -ItemType Directory -Path $dailyFolder -Force | Out-Null
     }
-    Read-Host "Copying original to destination... Press Enter to continue..." -ForegroundColor Yellow
     if (-not (Test-Path $workDirOrigPath)) {
         Write-Host "  > Copying Original to work folder ($workDir)..."
         Copy-Item -Path $latestVideo.FullName -Destination $workDirOrigPath
