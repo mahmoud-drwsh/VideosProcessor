@@ -1,10 +1,12 @@
-# TEST comment
-# Set encoding to UTF8 to handle Arabic text correctly
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
+<#
+.SYNOPSIS
+    Video processing script. Run as a script: .\main.ps1 (do not dot-source).
+#>
 param(
     [switch]$debugProgram
 )
+# Set encoding to UTF8 to handle Arabic text correctly
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # --- Configuration ---
 $videoSourceDir = "C:\Users\LEGION\Videos"
@@ -99,25 +101,18 @@ function Show-TitleConfirmationDialog {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
+    # Minimal callback type: no Form reference so it works in PowerShell 5.1 and 7
     $callbackSource = @'
 using System;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
 [ComVisible(true)]
 public class DialogResultCallback {
-    public static Form FormRef;
     public static bool? Result;
-    public void SetForm(object form) { FormRef = (Form)form; }
-    public void Confirm(bool ok) {
-        Result = ok;
-        if (FormRef != null)
-            FormRef.BeginInvoke(new Action(() => FormRef.Close()));
-    }
+    public void Confirm(bool ok) { Result = ok; }
 }
 '@
-    try { Add-Type -TypeDefinition $callbackSource -ReferencedAssemblies System.Windows.Forms } catch { }
+    try { Add-Type -TypeDefinition $callbackSource } catch { }
     [DialogResultCallback]::Result = $null
-    [DialogResultCallback]::FormRef = $null
 
     $titleEscaped = Escape-HtmlForDialog -Text $TitleText
     $artistEscaped = Escape-HtmlForDialog -Text $ArtistText
@@ -149,35 +144,44 @@ public class DialogResultCallback {
 </html>
 "@
 
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Confirm Title"
-    $form.Size = New-Object System.Drawing.Size(520, 260)
-    $form.StartPosition = "CenterScreen"
-    $form.FormBorderStyle = "FixedDialog"
+    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "title_confirm_" + [Guid]::NewGuid().ToString("N") + ".html")
+    [System.IO.File]::WriteAllText($tempFile, $html, [System.Text.Encoding]::UTF8)
+    try {
+        $form = New-Object System.Windows.Forms.Form
+        $form.Text = "Confirm Title"
+        $form.Size = New-Object System.Drawing.Size(520, 260)
+        $form.StartPosition = "CenterScreen"
+        $form.FormBorderStyle = "FixedDialog"
 
-    $browser = New-Object System.Windows.Forms.WebBrowser
-    $browser.Dock = [System.Windows.Forms.DockStyle]::Fill
-    $browser.ScriptErrorsSuppressed = $true
-    $browser.IsWebBrowserContextMenuEnabled = $false
-    $form.Controls.Add($browser)
+        $browser = New-Object System.Windows.Forms.WebBrowser
+        $browser.Dock = [System.Windows.Forms.DockStyle]::Fill
+        $browser.ScriptErrorsSuppressed = $true
+        $browser.IsWebBrowserContextMenuEnabled = $false
+        $form.Controls.Add($browser)
 
-    $callback = New-Object DialogResultCallback
-    $callback.SetForm($form)
-    $browser.ObjectForScripting = $callback
+        $callback = New-Object DialogResultCallback
+        $browser.ObjectForScripting = $callback
 
-    $browser.Add_DocumentCompleted({
-        param($sender, $e)
-        if ($sender.Document -ne $null -and $sender.Url.AbsoluteUri -eq "about:blank") {
-            $sender.Document.Open()
-            $sender.Document.Write($html)
-            $sender.Document.Close()
-        }
-    })
+        # When user clicks OK/Cancel, callback sets Result; timer closes the form
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 150
+        $timer.Add_Tick({
+            if ([DialogResultCallback]::Result -ne $null) {
+                $timer.Stop()
+                $form.Close()
+            }
+        })
+        $form.Add_Shown({ $timer.Start() })
+        $form.Add_FormClosed({ $timer.Stop() })
 
-    $browser.Navigate("about:blank")
-    $null = $form.ShowDialog()
-    $result = [DialogResultCallback]::Result
-    return ($result -eq $true)
+        $fileUri = [System.Uri]::new("file:///" + $tempFile.Replace("\", "/").Replace(" ", "%20"))
+        $browser.Navigate($fileUri.AbsoluteUri)
+        $null = $form.ShowDialog()
+        $result = [DialogResultCallback]::Result
+        return ($result -eq $true)
+    } finally {
+        if (Test-Path $tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 # Get average FPS for the first video stream using ffprobe.
