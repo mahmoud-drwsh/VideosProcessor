@@ -30,7 +30,7 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
     # H.265/HEVC 480p via libx265; CRF 24 = good quality, preset medium = balance of speed/size
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx265 -preset medium -crf 24 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx265 -preset fast -crf 24 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
