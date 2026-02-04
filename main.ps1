@@ -27,7 +27,7 @@ if (-not (Test-Path $destAudio)) { New-Item -ItemType Directory -Path $destAudio
 # --- FFmpeg Command Builders ---
 
 function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) {
-    return "-y -i `"$inputPath`" -vn -c:a libopus -b:a 17k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -i `"$inputPath`" -vn -c:a libopus -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H264480EncodeArgs($inputPath, $outputPath, $metaTitle) {
     # H.264 480p via libx264; CRF 23 = good quality, preset medium = balance of speed/size
