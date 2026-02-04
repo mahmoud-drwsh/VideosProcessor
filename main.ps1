@@ -285,10 +285,11 @@ while (Test-IsFileLocked -filePath $latestVideo.FullName) {
 Write-Host "Recording finished! Starting processing..." -ForegroundColor Green
 
 # --- Step 4: Define Names and Paths ---
-# Format: "YYYYMMDD Title" (Space separator). Sanitize title so backslashes etc. don't break paths.
+# Sanitize title so backslashes etc. don't break paths.
 $safeTitle = Get-SafeFileName -Text $cleanTitle
-$datePrefix = Get-Date -Format "yyyyMMdd "
-$baseName = "$datePrefix$safeTitle"
+# If title already starts with a date (e.g. 20260204, 2026-02-04, 2026\02\04), don't add our own.
+$titleStartsWithDate = $cleanTitle -match '^\s*(\d{8}|\d{4}[-/\s\\]?\d{2}[-/\s\\]?\d{2})'
+$baseName = if ($titleStartsWithDate) { $safeTitle } else { (Get-Date -Format "yyyyMMdd ") + $safeTitle }
 
 $audioOutPath = Join-Path $workDir "$baseName.opus"
 $videoOutPath = Join-Path $workDir "$baseName.mp4"
