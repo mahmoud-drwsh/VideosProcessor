@@ -79,14 +79,8 @@ function Show-FileSelector {
     return $null
 }
 
-# Escape text for safe use inside HTML (prevents XSS and broken markup).
-function Escape-HtmlForDialog {
-    param([string]$Text)
-    if ([string]::IsNullOrEmpty($Text)) { return "" }
-    return $Text -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;'
-}
-
-# Show RTL-friendly HTML confirmation dialog for title and album artist. Returns $true if OK, $false if Cancel/closed.
+# Native Windows (WinForms) dialog for title and artist. Editable text; RTL for Arabic.
+# Returns [PSCustomObject] with CleanTitle, AlbumArtist on OK; $null on Cancel.
 function Show-TitleConfirmationDialog {
     param(
         [string]$TitleText,
@@ -96,87 +90,72 @@ function Show-TitleConfirmationDialog {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
-    # Minimal callback type: no Form reference so it works in PowerShell 5.1 and 7
-    $callbackSource = @'
-using System;
-using System.Runtime.InteropServices;
-[ComVisible(true)]
-public class DialogResultCallback {
-    public static bool? Result;
-    public void Confirm(bool ok) { Result = ok; }
-}
-'@
-    try { Add-Type -TypeDefinition $callbackSource } catch { }
-    [DialogResultCallback]::Result = $null
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Confirm Title"
+    $form.Size = New-Object System.Drawing.Size(520, 200)
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $form.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.RightToLeftLayout = $true
 
-    $titleEscaped = Escape-HtmlForDialog -Text $TitleText
-    $artistEscaped = Escape-HtmlForDialog -Text $ArtistText
+    $margin = 20
+    $rowHeight = 28
+    $labelWidth = 70
 
-    $html = @"
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<style>
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 14px; padding: 24px; margin: 0; }
-  .row { margin-bottom: 16px; }
-  label { display: inline-block; width: 90px; font-weight: bold; }
-  .value { display: inline-block; min-width: 240px; padding: 8px 10px; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
-  .buttons { margin-top: 28px; padding-top: 16px; }
-  .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
-  .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
-  .buttons button:hover { opacity: 0.9; }
-</style>
-</head>
-<body>
-  <div class="row"><label>العنوان:</label><span class="value" id="titleText">$titleEscaped</span></div>
-  <div class="row"><label>الفنان:</label><span class="value" id="artistText">$artistEscaped</span></div>
-  <div class="buttons">
-    <button type="button" onclick="window.external.Confirm(true)">موافق</button>
-    <button type="button" onclick="window.external.Confirm(false)">إلغاء</button>
-  </div>
-</body>
-</html>
-"@
+    $lblTitle = New-Object System.Windows.Forms.Label
+    $lblTitle.Text = "العنوان:"
+    $lblTitle.Location = New-Object System.Drawing.Point($margin, 20)
+    $lblTitle.Size = New-Object System.Drawing.Size($labelWidth, 22)
+    $lblTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.Controls.Add($lblTitle)
 
-    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "title_confirm_" + [Guid]::NewGuid().ToString("N") + ".html")
-    [System.IO.File]::WriteAllText($tempFile, $html, [System.Text.Encoding]::UTF8)
-    try {
-        $form = New-Object System.Windows.Forms.Form
-        $form.Text = "Confirm Title"
-        $form.Size = New-Object System.Drawing.Size(520, 260)
-        $form.StartPosition = "CenterScreen"
-        $form.FormBorderStyle = "FixedDialog"
+    $txtTitle = New-Object System.Windows.Forms.TextBox
+    $txtTitle.Text = $TitleText
+    $txtTitle.Location = New-Object System.Drawing.Point($margin + $labelWidth + 8, 18)
+    $txtTitle.Size = New-Object System.Drawing.Size(400, 24)
+    $txtTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $txtTitle.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $form.Controls.Add($txtTitle)
 
-        $browser = New-Object System.Windows.Forms.WebBrowser
-        $browser.Dock = [System.Windows.Forms.DockStyle]::Fill
-        $browser.ScriptErrorsSuppressed = $true
-        $browser.IsWebBrowserContextMenuEnabled = $false
-        $form.Controls.Add($browser)
+    $lblArtist = New-Object System.Windows.Forms.Label
+    $lblArtist.Text = "الفنان:"
+    $lblArtist.Location = New-Object System.Drawing.Point($margin, 20 + $rowHeight + 10)
+    $lblArtist.Size = New-Object System.Drawing.Size($labelWidth, 22)
+    $lblArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $form.Controls.Add($lblArtist)
 
-        $callback = New-Object DialogResultCallback
-        $browser.ObjectForScripting = $callback
+    $txtArtist = New-Object System.Windows.Forms.TextBox
+    $txtArtist.Text = $ArtistText
+    $txtArtist.Location = New-Object System.Drawing.Point($margin + $labelWidth + 8, 18 + $rowHeight + 10)
+    $txtArtist.Size = New-Object System.Drawing.Size(400, 24)
+    $txtArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
+    $txtArtist.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+    $form.Controls.Add($txtArtist)
 
-        # When user clicks OK/Cancel, callback sets Result; timer closes the form
-        $timer = New-Object System.Windows.Forms.Timer
-        $timer.Interval = 150
-        $timer.Add_Tick({
-            if ([DialogResultCallback]::Result -ne $null) {
-                $timer.Stop()
-                $form.Close()
-            }
-        })
-        $form.Add_Shown({ $timer.Start() })
-        $form.Add_FormClosed({ $timer.Stop() })
+    $btnOK = New-Object System.Windows.Forms.Button
+    $btnOK.Text = "موافق"
+    $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $btnOK.Size = New-Object System.Drawing.Size(88, 28)
+    $btnOK.Location = New-Object System.Drawing.Point($margin, 130)
+    $form.AcceptButton = $btnOK
+    $form.Controls.Add($btnOK)
 
-        $fileUri = [System.Uri]::new("file:///" + $tempFile.Replace("\", "/").Replace(" ", "%20"))
-        $browser.Navigate($fileUri.AbsoluteUri)
-        $null = $form.ShowDialog()
-        $result = [DialogResultCallback]::Result
-        return ($result -eq $true)
-    } finally {
-        if (Test-Path $tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "إلغاء"
+    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $btnCancel.Size = New-Object System.Drawing.Size(88, 28)
+    $btnCancel.Location = New-Object System.Drawing.Point($margin + 96, 130)
+    $form.CancelButton = $btnCancel
+    $form.Controls.Add($btnCancel)
+
+    if ($form.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        return [PSCustomObject]@{
+            CleanTitle  = $txtTitle.Text.Trim()
+            AlbumArtist = $txtArtist.Text.Trim()
+        }
     }
+    return $null
 }
 
 # Get average FPS for the first video stream using ffprobe.
@@ -225,11 +204,13 @@ while ($true) {
             $cleanTitle  = $validLines[0].Trim() # Line 1: Filename part
             $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
             Write-Host "Title file OK. Showing confirmation..." -ForegroundColor Cyan
-            $confirmed = Show-TitleConfirmationDialog -TitleText $cleanTitle -ArtistText $albumArtist
-            if (-not $confirmed) {
+            $result = Show-TitleConfirmationDialog -TitleText $cleanTitle -ArtistText $albumArtist
+            if (-not $result) {
                 exit 0
             }
-            break # Found both lines and user confirmed, proceed
+            $cleanTitle = $result.CleanTitle
+            $albumArtist = $result.AlbumArtist
+            break # User confirmed (possibly edited), proceed
         }
     }
     Write-Host "Waiting for 2 lines in $titleFilePath..." -ForegroundColor Yellow
