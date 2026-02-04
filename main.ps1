@@ -92,6 +92,20 @@ function Get-SafeFileName {
     return ($sanitized -replace '\s+', ' ').Trim()
 }
 
+# If title starts with a date (e.g. 2026/02/04, 2026\02\04, 2026-02-04), normalize to YYYYMMDD (no slashes).
+function Normalize-LeadingDateInTitle {
+    param([string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    if ($Text -match '^\s*(\d{4})[-/\s\\]+(\d{1,2})[-/\s\\]+(\d{1,2})(\s.*|$)') {
+        $y = $Matches[1]
+        $m = $Matches[2].PadLeft(2, '0')
+        $d = $Matches[3].PadLeft(2, '0')
+        $rest = $Matches[4]
+        return "$y$m$d$rest"
+    }
+    return $Text
+}
+
 # Escape text for safe use in HTML (e.g. value="" attribute).
 function Escape-HtmlForDialog {
     param([string]$Text)
@@ -156,15 +170,23 @@ public class DialogResultCallback {
     <button type="button" onclick="window.external.Confirm(false, '', '')">إلغاء</button>
   </div>
 <script>
-(function() {
-  var firstFocus = { titleInput: true, artistInput: true };
-  document.getElementById('titleInput').addEventListener('focus', function() {
-    if (firstFocus.titleInput) { firstFocus.titleInput = false; setTimeout(function() { document.getElementById('titleInput').select(); }, 0); }
-  });
-  document.getElementById('artistInput').addEventListener('focus', function() {
-    if (firstFocus.artistInput) { firstFocus.artistInput = false; setTimeout(function() { document.getElementById('artistInput').select(); }, 0); }
-  });
-})();
+window.initSelectOnFirstClick = function() {
+  var firstTime = { titleInput: true, artistInput: true };
+  function doSelect(el, id) {
+    if (firstTime[id]) {
+      firstTime[id] = false;
+      el.select();
+    }
+  }
+  function add(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.onfocus = function() { doSelect(el, id); };
+    el.onmouseup = function() { doSelect(el, id); };
+  }
+  add('titleInput');
+  add('artistInput');
+};
 </script>
 </body>
 </html>
@@ -198,6 +220,14 @@ public class DialogResultCallback {
             })
         $form.Add_Shown({ $timer.Start() })
         $form.Add_FormClosed({ $timer.Stop() })
+
+        $browser.Add_DocumentCompleted({
+            if ($browser.Document -and $browser.ReadyState -eq [System.Windows.Forms.WebBrowserReadyState]::Complete) {
+                try {
+                    $browser.Document.InvokeScript("initSelectOnFirstClick")
+                } catch { }
+            }
+        })
 
         $fileUri = [System.Uri]::new("file:///" + $tempFile.Replace("\", "/").Replace(" ", "%20"))
         $browser.Navigate($fileUri.AbsoluteUri)
@@ -271,6 +301,8 @@ while ($true) {
             }
             $cleanTitle = $result.CleanTitle
             $albumArtist = $result.AlbumArtist
+            # Normalize leading date to YYYYMMDD (remove slashes) for consistency
+            $cleanTitle = Normalize-LeadingDateInTitle -Text $cleanTitle
             # Overwrite title.txt with confirmed text so next run uses the same values
             Set-Content -Path $titleFilePath -Value @($cleanTitle, $albumArtist) -Encoding UTF8
             break # User confirmed (possibly edited), proceed
