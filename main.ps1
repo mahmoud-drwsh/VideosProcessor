@@ -2,6 +2,10 @@
 # Set encoding to UTF8 to handle Arabic text correctly
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+param(
+    [switch]$debugProgram
+)
+
 # --- Configuration ---
 $videoSourceDir = "C:\Users\LEGION\Videos"
 $titleFilePath  = "C:\Users\LEGION\Desktop\title.txt"
@@ -316,6 +320,7 @@ if (-not (Test-Path $videoOutPath)) {
 }
 
 # --- Step 6: Copy to Destinations (NO OVERWRITE) ---
+if (-not $debugProgram) {
 
 # 6a. Copy Original to YYYY-MM-DD folder
 $folderDateName = Get-Date -Format "yyyy-MM-dd"
@@ -353,6 +358,10 @@ if (-not (Test-Path $finalCompPath)) {
     Copy-Item -Path $videoOutPath -Destination $finalCompPath
 } else {
     Write-Host "  > Compressed video already in destination. Skipping." -ForegroundColor DarkGray
+}
+
+} else {
+    Write-Host "Copy step skipped (debug mode)." -ForegroundColor Cyan
 }
 
 # --- Final Step: Exit ---
