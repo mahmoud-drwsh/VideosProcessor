@@ -3,7 +3,8 @@
     Video processing script. Run as a script: .\main.ps1 (do not dot-source).
 #>
 param(
-    [switch]$debugProgram
+    [switch]$debugProgram,
+    [switch]$skipAudio
 )
 # Set encoding to UTF8 to handle Arabic text correctly
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -306,16 +307,17 @@ if (-not $debugProgram) {
 
 # --- Step 5: Process Files (NO OVERWRITE) ---
 
-# 5a. Extract Audio
-if (-not (Test-Path $audioOutPath)) {
+# 5a. Extract Audio (skipped if -skipAudio)
+if ($skipAudio) {
+    Write-Host "  > Audio step skipped (-skipAudio)." -ForegroundColor DarkGray
+} elseif (-not (Test-Path $audioOutPath)) {
     Write-Host "  > Extracting Audio..."
     $metaTitle = "الشيخ محمد فواز النمر"
     $audioArgs = Get-AudioEncodeArgs -inputPath $latestVideo.FullName -outputPath $audioOutPath -metaTitle $metaTitle -albumArtist $albumArtist
     Write-Host "  > ffmpeg audio args:" -ForegroundColor Magenta
     Write-Host "    ffmpeg $audioArgs"
     $null = Start-Process -FilePath "ffmpeg" -ArgumentList $audioArgs -Wait -NoNewWindow -PassThru
-}
-else {
+} else {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
@@ -337,14 +339,17 @@ if (-not $debugProgram) {
 
     # 6a. Original already copied in Step 4b (to work folder + final folder).
 
-    # 6b. Copy Audio
-    $finalAudioPath = Join-Path $destAudio "$baseName.opus"
-    if (-not (Test-Path $finalAudioPath)) {
-        Write-Host "  > Copying Audio..."
-        Copy-Item -Path $audioOutPath -Destination $finalAudioPath
-    }
-    else {
-        Write-Host "  > Audio file already in destination. Skipping." -ForegroundColor DarkGray
+    # 6b. Copy Audio (skipped if -skipAudio)
+    if ($skipAudio) {
+        Write-Host "  > Audio copy skipped (-skipAudio)." -ForegroundColor DarkGray
+    } else {
+        $finalAudioPath = Join-Path $destAudio "$baseName.opus"
+        if (-not (Test-Path $finalAudioPath)) {
+            Write-Host "  > Copying Audio..."
+            Copy-Item -Path $audioOutPath -Destination $finalAudioPath
+        } else {
+            Write-Host "  > Audio file already in destination. Skipping." -ForegroundColor DarkGray
+        }
     }
 
     # 6c. Copy Compressed Video
