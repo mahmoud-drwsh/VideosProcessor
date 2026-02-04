@@ -8,12 +8,10 @@ param(
 # Set encoding to UTF8 to handle Arabic text correctly
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# --- Configuration ---
+# --- Global variables (paths and config used throughout the script) ---
 $videoSourceDir = "C:\Users\LEGION\Videos"
 $titleFilePath  = "C:\Users\LEGION\Desktop\title.txt"
 $workDir        = "C:\Users\LEGION\Desktop\إخراج"
-
-# Destination Paths
 $destOrigVideo  = "D:\01 - الفيديو"
 $destCompVideo  = "D:\02 - مضغوط"
 $destAudio      = "D:\03 - صوت"
@@ -64,7 +62,8 @@ function Show-FileSelector {
 
     if ($InitialDirectory -and (Test-Path $InitialDirectory)) {
         $openFileDialog.InitialDirectory = $InitialDirectory
-    } else {
+    }
+    else {
         $openFileDialog.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")
     }
 
@@ -167,11 +166,11 @@ public class DialogResultCallback {
         $timer = New-Object System.Windows.Forms.Timer
         $timer.Interval = 150
         $timer.Add_Tick({
-            if ([DialogResultCallback]::Result -ne $null) {
-                $timer.Stop()
-                $form.Close()
-            }
-        })
+                if ([DialogResultCallback]::Result -ne $null) {
+                    $timer.Stop()
+                    $form.Close()
+                }
+            })
         $form.Add_Shown({ $timer.Start() })
         $form.Add_FormClosed({ $timer.Stop() })
 
@@ -188,7 +187,8 @@ public class DialogResultCallback {
             }
         }
         return $null
-    } finally {
+    }
+    finally {
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
     }
 }
@@ -219,7 +219,8 @@ function Test-IsFileLocked($filePath) {
         $stream = [System.IO.File]::Open($filePath, 'Open', 'Read', 'None')
         $stream.Close()
         return $false
-    } catch {
+    }
+    catch {
         return $true
     }
 }
@@ -236,7 +237,7 @@ while ($true) {
         $validLines = $lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
         if ($validLines.Count -ge 2) {
-            $cleanTitle  = $validLines[0].Trim() # Line 1: Filename part
+            $cleanTitle = $validLines[0].Trim() # Line 1: Filename part
             $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
             Write-Host "Title file OK. Showing confirmation..." -ForegroundColor Cyan
             $result = Show-TitleConfirmationDialog -TitleText $cleanTitle -ArtistText $albumArtist
@@ -272,10 +273,36 @@ Write-Host "Recording finished! Starting processing..." -ForegroundColor Green
 # --- Step 4: Define Names and Paths ---
 # Format: "YYYYMMDD Title" (Space separator)
 $datePrefix = Get-Date -Format "yyyyMMdd " 
-$baseName   = "$datePrefix$cleanTitle"
+$baseName = "$datePrefix$cleanTitle"
 
-$audioOutPath   = Join-Path $workDir "$baseName.opus"
-$videoOutPath   = Join-Path $workDir "$baseName.mp4"
+$audioOutPath = Join-Path $workDir "$baseName.opus"
+$videoOutPath = Join-Path $workDir "$baseName.mp4"
+
+# Paths for original copy (used before encoding)
+$folderDateName  = Get-Date -Format "yyyy-MM-dd"
+$dailyFolder     = Join-Path $destOrigVideo $folderDateName
+$finalOrigPath   = Join-Path $dailyFolder "$baseName$($latestVideo.Extension)"
+$workDirOrigPath = Join-Path $workDir "$baseName$($latestVideo.Extension)"
+
+# --- Step 4b: Copy Original First (to output folder + final folder, before re-encode) ---
+if (-not $debugProgram) {
+    if (-not (Test-Path $dailyFolder)) {
+        New-Item -ItemType Directory -Path $dailyFolder -Force | Out-Null
+    }
+    Read-Host "Copying original to destination... Press Enter to continue..." -ForegroundColor Yellow
+    if (-not (Test-Path $workDirOrigPath)) {
+        Write-Host "  > Copying Original to work folder ($workDir)..."
+        Copy-Item -Path $latestVideo.FullName -Destination $workDirOrigPath
+    } else {
+        Write-Host "  > Original already in work folder. Skipping." -ForegroundColor DarkGray
+    }
+    if (-not (Test-Path $finalOrigPath)) {
+        Write-Host "  > Copying Original to $dailyFolder..."
+        Copy-Item -Path $latestVideo.FullName -Destination $finalOrigPath
+    } else {
+        Write-Host "  > Original already in final folder. Skipping." -ForegroundColor DarkGray
+    }
+}
 
 # --- Step 5: Process Files (NO OVERWRITE) ---
 
@@ -287,7 +314,8 @@ if (-not (Test-Path $audioOutPath)) {
     Write-Host "  > ffmpeg audio args:" -ForegroundColor Magenta
     Write-Host "    ffmpeg $audioArgs"
     $null = Start-Process -FilePath "ffmpeg" -ArgumentList $audioArgs -Wait -NoNewWindow -PassThru
-} else {
+}
+else {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
@@ -299,52 +327,38 @@ if (-not (Test-Path $videoOutPath)) {
     Write-Host "  > ffmpeg H.264 480p args:" -ForegroundColor Magenta
     Write-Host "    ffmpeg $h264Args"
     $null = Start-Process -FilePath "ffmpeg" -ArgumentList $h264Args -Wait -NoNewWindow -PassThru
-} else {
+}
+else {
     Write-Host "  > Compressed video already exists. Skipping." -ForegroundColor DarkGray
 }
 
 # --- Step 6: Copy to Destinations (NO OVERWRITE) ---
 if (-not $debugProgram) {
 
-# 6a. Copy Original to YYYY-MM-DD folder
-$folderDateName = Get-Date -Format "yyyy-MM-dd"
-$dailyFolder    = Join-Path $destOrigVideo $folderDateName
+    # 6a. Original already copied in Step 4b (to work folder + final folder).
 
-# Create daily folder if needed
-if (-not (Test-Path $dailyFolder)) {
-    New-Item -ItemType Directory -Path $dailyFolder -Force | Out-Null
+    # 6b. Copy Audio
+    $finalAudioPath = Join-Path $destAudio "$baseName.opus"
+    if (-not (Test-Path $finalAudioPath)) {
+        Write-Host "  > Copying Audio..."
+        Copy-Item -Path $audioOutPath -Destination $finalAudioPath
+    }
+    else {
+        Write-Host "  > Audio file already in destination. Skipping." -ForegroundColor DarkGray
+    }
+
+    # 6c. Copy Compressed Video
+    $finalCompPath = Join-Path $destCompVideo "$baseName.mp4"
+    if (-not (Test-Path $finalCompPath)) {
+        Write-Host "  > Copying Compressed Video..."
+        Copy-Item -Path $videoOutPath -Destination $finalCompPath
+    }
+    else {
+        Write-Host "  > Compressed video already in destination. Skipping." -ForegroundColor DarkGray
+    }
+
 }
-
-Read-Host "Copying to destination... Press Enter to continue..." -ForegroundColor Yellow
-
-$finalOrigPath = Join-Path $dailyFolder "$baseName$($latestVideo.Extension)"
-
-if (-not (Test-Path $finalOrigPath)) {
-    Write-Host "  > Copying Original to $dailyFolder..."
-    Copy-Item -Path $latestVideo.FullName -Destination $finalOrigPath
-} else {
-    Write-Host "  > Original file already in destination. Skipping." -ForegroundColor DarkGray
-}
-
-# 6b. Copy Audio
-$finalAudioPath = Join-Path $destAudio "$baseName.opus"
-if (-not (Test-Path $finalAudioPath)) {
-    Write-Host "  > Copying Audio..."
-    Copy-Item -Path $audioOutPath -Destination $finalAudioPath
-} else {
-    Write-Host "  > Audio file already in destination. Skipping." -ForegroundColor DarkGray
-}
-
-# 6c. Copy Compressed Video
-$finalCompPath = Join-Path $destCompVideo "$baseName.mp4"
-if (-not (Test-Path $finalCompPath)) {
-    Write-Host "  > Copying Compressed Video..."
-    Copy-Item -Path $videoOutPath -Destination $finalCompPath
-} else {
-    Write-Host "  > Compressed video already in destination. Skipping." -ForegroundColor DarkGray
-}
-
-} else {
+else {
     Write-Host "Copy step skipped (debug mode)." -ForegroundColor Cyan
 }
 
