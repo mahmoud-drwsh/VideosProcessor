@@ -82,7 +82,14 @@ function Show-FileSelector {
     return $null
 }
 
-# Show RTL-friendly confirmation dialog for title and album artist. Returns $true if OK, $false if Cancel/closed.
+# Escape text for safe use inside HTML (prevents XSS and broken markup).
+function Escape-HtmlForDialog {
+    param([string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    return $Text -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;'
+}
+
+# Show RTL-friendly HTML confirmation dialog for title and album artist. Returns $true if OK, $false if Cancel/closed.
 function Show-TitleConfirmationDialog {
     param(
         [string]$TitleText,
@@ -92,86 +99,85 @@ function Show-TitleConfirmationDialog {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 
-    $marginH = 40
-    $marginV = 24
-    $minFormWidth = 400
-    $maxFormWidth = 900
-    $fontTitle = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-    $fontArtist = New-Object System.Drawing.Font("Segoe UI", 10)
-    $szTitle = [System.Windows.Forms.TextRenderer]::MeasureText($TitleText, $fontTitle)
-    $szArtist = [System.Windows.Forms.TextRenderer]::MeasureText($ArtistText, $fontArtist)
-    $contentWidth = [Math]::Max($szTitle.Width, $szArtist.Width)
-    $formWidth = [Math]::Min($maxFormWidth, [Math]::Max($minFormWidth, $contentWidth + $marginH * 2))
-    $textBoxWidth = $formWidth - ($marginH * 2)
-    $formHeight = 220
-    $buttonY = $formHeight - $marginV - 32
-    $buttonGap = 12
+    $callbackSource = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+[ComVisible(true)]
+public class DialogResultCallback {
+    public static Form FormRef;
+    public static bool? Result;
+    public void SetForm(object form) { FormRef = (Form)form; }
+    public void Confirm(bool ok) {
+        Result = ok;
+        if (FormRef != null)
+            FormRef.BeginInvoke(new Action(() => FormRef.Close()));
+    }
+}
+'@
+    try { Add-Type -TypeDefinition $callbackSource -ReferencedAssemblies System.Windows.Forms } catch { }
+    [DialogResultCallback]::Result = $null
+    [DialogResultCallback]::FormRef = $null
+
+    $titleEscaped = Escape-HtmlForDialog -Text $TitleText
+    $artistEscaped = Escape-HtmlForDialog -Text $ArtistText
+
+    $html = @"
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 14px; padding: 24px; margin: 0; }
+  .row { margin-bottom: 16px; }
+  label { display: inline-block; width: 90px; font-weight: bold; }
+  .value { display: inline-block; min-width: 240px; padding: 8px 10px; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+  .buttons { margin-top: 28px; padding-top: 16px; }
+  .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
+  .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
+  .buttons button:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+  <div class="row"><label>العنوان:</label><span class="value" id="titleText">$titleEscaped</span></div>
+  <div class="row"><label>الفنان:</label><span class="value" id="artistText">$artistEscaped</span></div>
+  <div class="buttons">
+    <button type="button" onclick="window.external.Confirm(true)">موافق</button>
+    <button type="button" onclick="window.external.Confirm(false)">إلغاء</button>
+  </div>
+</body>
+</html>
+"@
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Confirm Title"
-    $form.Size = New-Object System.Drawing.Size($formWidth, $formHeight)
+    $form.Size = New-Object System.Drawing.Size(520, 260)
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
-    $form.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $form.RightToLeftLayout = $true
-    $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 
-    $lblTitleCaption = New-Object System.Windows.Forms.Label
-    $lblTitleCaption.Text = "العنوان:"
-    $lblTitleCaption.Location = New-Object System.Drawing.Point($marginH, 20)
-    $lblTitleCaption.AutoSize = $true
-    $lblTitleCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $form.Controls.Add($lblTitleCaption)
+    $browser = New-Object System.Windows.Forms.WebBrowser
+    $browser.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $browser.ScriptErrorsSuppressed = $true
+    $browser.IsWebBrowserContextMenuEnabled = $false
+    $form.Controls.Add($browser)
 
-    $txtTitle = New-Object System.Windows.Forms.TextBox
-    $txtTitle.Text = $TitleText
-    $txtTitle.Location = New-Object System.Drawing.Point($marginH, 44)
-    $txtTitle.Size = New-Object System.Drawing.Size($textBoxWidth, 24)
-    $txtTitle.Multiline = $false
-    $txtTitle.ReadOnly = $true
-    $txtTitle.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-    $txtTitle.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $txtTitle.Font = $fontTitle
-    $txtTitle.BackColor = [System.Drawing.SystemColors]::Window
-    $form.Controls.Add($txtTitle)
+    $callback = New-Object DialogResultCallback
+    $callback.SetForm($form)
+    $browser.ObjectForScripting = $callback
 
-    $lblArtistCaption = New-Object System.Windows.Forms.Label
-    $lblArtistCaption.Text = "الفنان:"
-    $lblArtistCaption.Location = New-Object System.Drawing.Point($marginH, 76)
-    $lblArtistCaption.AutoSize = $true
-    $lblArtistCaption.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $form.Controls.Add($lblArtistCaption)
+    $browser.Add_DocumentCompleted({
+        param($sender, $e)
+        if ($sender.Document -ne $null -and $sender.Url.AbsoluteUri -eq "about:blank") {
+            $sender.Document.Open()
+            $sender.Document.Write($html)
+            $sender.Document.Close()
+        }
+    })
 
-    $txtArtist = New-Object System.Windows.Forms.TextBox
-    $txtArtist.Text = $ArtistText
-    $txtArtist.Location = New-Object System.Drawing.Point($marginH, 98)
-    $txtArtist.Size = New-Object System.Drawing.Size($textBoxWidth, 24)
-    $txtArtist.Multiline = $false
-    $txtArtist.ReadOnly = $true
-    $txtArtist.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-    $txtArtist.RightToLeft = [System.Windows.Forms.RightToLeft]::Yes
-    $txtArtist.Font = $fontArtist
-    $txtArtist.BackColor = [System.Drawing.SystemColors]::Window
-    $form.Controls.Add($txtArtist)
-
-    $btnOK = New-Object System.Windows.Forms.Button
-    $btnOK.Text = "موافق"
-    $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
-    $btnOK.Size = New-Object System.Drawing.Size(88, 32)
-    $btnOK.Location = New-Object System.Drawing.Point($marginH, $buttonY)
-    $form.AcceptButton = $btnOK
-    $form.Controls.Add($btnOK)
-
-    $btnCancel = New-Object System.Windows.Forms.Button
-    $btnCancel.Text = "إلغاء"
-    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
-    $btnCancel.Size = New-Object System.Drawing.Size(88, 32)
-    $btnCancel.Location = New-Object System.Drawing.Point($marginH + 88 + $buttonGap, $buttonY)
-    $form.CancelButton = $btnCancel
-    $form.Controls.Add($btnCancel)
-
-    $result = $form.ShowDialog()
-    return ($result -eq [System.Windows.Forms.DialogResult]::OK)
+    $browser.Navigate("about:blank")
+    $null = $form.ShowDialog()
+    $result = [DialogResultCallback]::Result
+    return ($result -eq $true)
 }
 
 # Get average FPS for the first video stream using ffprobe.
