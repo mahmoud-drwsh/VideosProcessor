@@ -27,9 +27,9 @@ if (-not (Test-Path $destAudio)) { New-Item -ItemType Directory -Path $destAudio
 function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) {
     return "-y -i `"$inputPath`" -vn -c:a libopus -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
-function Get-H264480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    # H.264 480p via libx264; CRF 21 = good quality, preset medium = balance of speed/size
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx264 -preset medium -crf 21 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
+    # H.265/HEVC 480p via libx265; CRF 24 = good quality, preset medium = balance of speed/size
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx265 -preset medium -crf 24 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
@@ -319,14 +319,14 @@ else {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
-# 5b. Re-encode Video (H.264 libx264 480p)
+# 5b. Re-encode Video (H.265 libx265 480p)
 if (-not (Test-Path $videoOutPath)) {
-    Write-Host "  > Re-encoding Video (H.264 libx264 480p)..."
+    Write-Host "  > Re-encoding Video (H.265 libx265 480p)..."
     $metaTitle = "الشيخ محمد فواز النمر"
-    $h264Args = Get-H264480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -metaTitle $metaTitle
-    Write-Host "  > ffmpeg H.264 480p args:" -ForegroundColor Magenta
-    Write-Host "    ffmpeg $h264Args"
-    $null = Start-Process -FilePath "ffmpeg" -ArgumentList $h264Args -Wait -NoNewWindow -PassThru
+    $h265Args = Get-H265480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -metaTitle $metaTitle
+    Write-Host "  > ffmpeg H.265 480p args:" -ForegroundColor Magenta
+    Write-Host "    ffmpeg $h265Args"
+    $null = Start-Process -FilePath "ffmpeg" -ArgumentList $h265Args -Wait -NoNewWindow -PassThru
 }
 else {
     Write-Host "  > Compressed video already exists. Skipping." -ForegroundColor DarkGray
