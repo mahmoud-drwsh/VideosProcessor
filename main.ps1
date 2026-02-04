@@ -155,6 +155,17 @@ public class DialogResultCallback {
     <button type="button" onclick="window.external.Confirm(true, document.getElementById('titleInput').value, document.getElementById('artistInput').value)">موافق</button>
     <button type="button" onclick="window.external.Confirm(false, '', '')">إلغاء</button>
   </div>
+<script>
+(function() {
+  var firstFocus = { titleInput: true, artistInput: true };
+  document.getElementById('titleInput').addEventListener('focus', function() {
+    if (firstFocus.titleInput) { firstFocus.titleInput = false; setTimeout(function() { document.getElementById('titleInput').select(); }, 0); }
+  });
+  document.getElementById('artistInput').addEventListener('focus', function() {
+    if (firstFocus.artistInput) { firstFocus.artistInput = false; setTimeout(function() { document.getElementById('artistInput').select(); }, 0); }
+  });
+})();
+</script>
 </body>
 </html>
 "@
@@ -260,6 +271,8 @@ while ($true) {
             }
             $cleanTitle = $result.CleanTitle
             $albumArtist = $result.AlbumArtist
+            # Overwrite title.txt with confirmed text so next run uses the same values
+            Set-Content -Path $titleFilePath -Value @($cleanTitle, $albumArtist) -Encoding UTF8
             break # User confirmed (possibly edited), proceed
         }
     }
