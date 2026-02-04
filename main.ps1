@@ -26,17 +26,12 @@ if (-not (Test-Path $destAudio)) { New-Item -ItemType Directory -Path $destAudio
 
 # --- FFmpeg Command Builders ---
 
-function Get-RcLookaheadFrames($fps) {
-    $lookahead = if ($fps) { [int][Math]::Round($fps * 2) } else { 64 }
-    return [Math]::Max(10, [Math]::Min($lookahead, 120))
-}
-
 function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) {
     return "-y -i `"$inputPath`" -vn -c:a libopus -b:a 17k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
-function Get-H264480EncodeArgs($inputPath, $outputPath, $lookaheadFrames, $metaTitle) {
-    # H.264 480p; CQ 29 keeps size reasonable
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v h264_nvenc -preset p3 -tune hq -cq 26 -rc vbr -spatial-aq 1 -temporal-aq 1 -rc-lookahead $lookaheadFrames -b:v 0 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+function Get-H264480EncodeArgs($inputPath, $outputPath, $metaTitle) {
+    # H.264 480p via libx264; CRF 23 = good quality, preset medium = balance of speed/size
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx264 -preset medium -crf 23 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
@@ -280,13 +275,11 @@ if (-not (Test-Path $audioOutPath)) {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
-# 5b. Re-encode Video (H.264 NVENC 480p)
+# 5b. Re-encode Video (H.264 libx264 480p)
 if (-not (Test-Path $videoOutPath)) {
-    Write-Host "  > Re-encoding Video (H.264 NVENC 480p)..."
-    $fps = Get-VideoFps -filePath $latestVideo.FullName
-    $lookaheadFrames = Get-RcLookaheadFrames -fps $fps
+    Write-Host "  > Re-encoding Video (H.264 libx264 480p)..."
     $metaTitle = "الشيخ محمد فواز النمر"
-    $h264Args = Get-H264480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -lookaheadFrames $lookaheadFrames -metaTitle $metaTitle
+    $h264Args = Get-H264480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -metaTitle $metaTitle
     Write-Host "  > ffmpeg H.264 480p args:" -ForegroundColor Magenta
     Write-Host "    ffmpeg $h264Args"
     $null = Start-Process -FilePath "ffmpeg" -ArgumentList $h264Args -Wait -NoNewWindow -PassThru
