@@ -80,6 +80,18 @@ function Show-FileSelector {
     return $null
 }
 
+# Sanitize a string for safe use in file/directory names (remove path-breaking characters).
+function Get-SafeFileName {
+    param([string]$Text)
+    if ([string]::IsNullOrEmpty($Text)) { return "" }
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    $sanitized = $Text
+    foreach ($c in $invalid) {
+        $sanitized = $sanitized.Replace([string]$c, " ")
+    }
+    return ($sanitized -replace '\s+', ' ').Trim()
+}
+
 # Escape text for safe use in HTML (e.g. value="" attribute).
 function Escape-HtmlForDialog {
     param([string]$Text)
@@ -273,9 +285,10 @@ while (Test-IsFileLocked -filePath $latestVideo.FullName) {
 Write-Host "Recording finished! Starting processing..." -ForegroundColor Green
 
 # --- Step 4: Define Names and Paths ---
-# Format: "YYYYMMDD Title" (Space separator)
-$datePrefix = Get-Date -Format "yyyyMMdd " 
-$baseName = "$datePrefix$cleanTitle"
+# Format: "YYYYMMDD Title" (Space separator). Sanitize title so backslashes etc. don't break paths.
+$safeTitle = Get-SafeFileName -Text $cleanTitle
+$datePrefix = Get-Date -Format "yyyyMMdd "
+$baseName = "$datePrefix$safeTitle"
 
 $audioOutPath = Join-Path $workDir "$baseName.opus"
 $videoOutPath = Join-Path $workDir "$baseName.mp4"
