@@ -30,8 +30,8 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
     return "-y -i `"$inputPath`" -vn -c:a libopus -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H264480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    # H.264 480p via libx264; CRF 23 = good quality, preset medium = balance of speed/size
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx264 -preset medium -crf 23 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    # H.264 480p via libx264; CRF 21 = good quality, preset medium = balance of speed/size
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx264 -preset medium -crf 21 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
