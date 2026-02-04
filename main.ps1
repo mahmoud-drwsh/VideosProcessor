@@ -350,4 +350,4 @@ if (-not (Test-Path $finalCompPath)) {
 
 # --- Final Step: Exit ---
 Write-Host "All tasks completed successfully. Exiting." -ForegroundColor Green
-Start-Sleep -Seconds 30
+Start-Sleep -Seconds 5
