@@ -184,110 +184,6 @@ public class DialogResultCallback {
     }
 }
 
-# Show HTML dialog to choose one of the last 10 videos or Browse. Returns int: 0-9 = index, 10 = Browse, -1 or null = Cancel.
-function Show-VideoChoiceDialog {
-    param(
-        [array]$VideoItems
-    )
-
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-
-    $videoChoiceSource = @'
-using System;
-using System.Runtime.InteropServices;
-[ComVisible(true)]
-public class VideoChoiceCallback {
-    public static int? Result;
-    public void Choose(object indexObj) {
-        if (indexObj == null) return;
-        try { Result = Convert.ToInt32(indexObj); } catch { }
-    }
-}
-'@
-    try { Add-Type -TypeDefinition $videoChoiceSource } catch { }
-    [VideoChoiceCallback]::Result = $null
-
-    $rows = ""
-    $count = [Math]::Min(10, $VideoItems.Count)
-    for ($i = 0; $i -lt $count; $i++) {
-        $item = $VideoItems[$i]
-        $nameEscaped = Escape-HtmlForDialog -Text $item.Name
-        $dateStr = $item.LastWriteTime.ToString("yyyy-MM-dd HH:mm")
-        $dateEscaped = Escape-HtmlForDialog -Text $dateStr
-        $checked = if ($i -eq 0) { " checked=`"checked`"" } else { "" }
-        $rows += "  <div class=`"row`"><label><input type=`"radio`" name=`"video`" value=`"$i`"$checked> $nameEscaped <span class=`"date`">($dateEscaped)</span></label></div>`n"
-    }
-    $browseChecked = if ($count -eq 0) { " checked=`"checked`"" } else { "" }
-    $browseRow = "  <div class=`"row`"><label><input type=`"radio`" name=`"video`" value=`"10`"$browseChecked> " + (Escape-HtmlForDialog -Text "[Browse for a file...]") + "</label></div>"
-
-    $html = @"
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<style>
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 14px; padding: 24px; margin: 0; }
-  .row { margin-bottom: 10px; }
-  .row label { cursor: pointer; display: block; padding: 6px 0; }
-  .row input { margin-left: 8px; }
-  .date { color: #666; font-size: 12px; }
-  .buttons { margin-top: 20px; padding-top: 16px; }
-  .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
-  .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
-  .buttons button:hover { opacity: 0.9; }
-</style>
-</head>
-<body>
-  <p class="title">Select a video:</p>
-$rows
-$browseRow
-  <div class="buttons">
-    <button type="button" onclick="var r=document.querySelector('input[name=video]:checked');if(r){window.external.Choose(parseInt(r.value,10));}">موافق</button>
-    <button type="button" onclick="window.external.Choose(-1)">إلغاء</button>
-  </div>
-</body>
-</html>
-"@
-
-    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "video_choice_" + [Guid]::NewGuid().ToString("N") + ".html")
-    [System.IO.File]::WriteAllText($tempFile, $html, [System.Text.Encoding]::UTF8)
-    try {
-        $form = New-Object System.Windows.Forms.Form
-        $form.Text = "Select Video"
-        $form.Size = New-Object System.Drawing.Size(560, 420)
-        $form.StartPosition = "CenterScreen"
-        $form.FormBorderStyle = "FixedDialog"
-
-        $browser = New-Object System.Windows.Forms.WebBrowser
-        $browser.Dock = [System.Windows.Forms.DockStyle]::Fill
-        $browser.ScriptErrorsSuppressed = $true
-        $browser.IsWebBrowserContextMenuEnabled = $false
-        $form.Controls.Add($browser)
-
-        $callback = New-Object VideoChoiceCallback
-        $browser.ObjectForScripting = $callback
-
-        $timer = New-Object System.Windows.Forms.Timer
-        $timer.Interval = 150
-        $timer.Add_Tick({
-            if ([VideoChoiceCallback]::Result -ne $null) {
-                $timer.Stop()
-                $form.Close()
-            }
-        })
-        $form.Add_Shown({ $timer.Start() })
-        $form.Add_FormClosed({ $timer.Stop() })
-
-        $fileUri = [System.Uri]::new("file:///" + $tempFile.Replace("\", "/").Replace(" ", "%20"))
-        $browser.Navigate($fileUri.AbsoluteUri)
-        $null = $form.ShowDialog()
-        return [VideoChoiceCallback]::Result
-    } finally {
-        if (Test-Path $tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
-    }
-}
-
 # Get average FPS for the first video stream using ffprobe.
 function Get-VideoFps($filePath) {
     # avg_frame_rate is typically like "30000/1001" or "30/1"
@@ -345,37 +241,12 @@ while ($true) {
     Start-Sleep -Milliseconds 500
 }
 
-# --- Step 2: Select Video (Recent or Browse) ---
-Write-Host "Looking for recent videos..." -ForegroundColor Cyan
-$recentVideos = @(Get-ChildItem -Path $videoSourceDir -File |
-                 Sort-Object LastWriteTime -Descending |
-                 Select-Object -First 10)
-
-if ($recentVideos.Count -eq 0) {
-    Write-Host "No recent videos found in source folder." -ForegroundColor Yellow
-}
-
-$latestVideo = $null
-while ($true) {
-    $choice = Show-VideoChoiceDialog -VideoItems $recentVideos
-    if ($choice -eq $null -or $choice -eq -1) {
-        exit 0
-    }
-    if ($choice -eq 10) {
-        $browsedFile = Show-FileSelector -InitialDirectory $videoSourceDir
-        if ($browsedFile) {
-            $latestVideo = Get-Item $browsedFile
-            break
-        }
-        Write-Host "No file selected. Try again or pick from the list." -ForegroundColor Yellow
-        continue
-    }
-    if ($choice -ge 0 -and $choice -le 9 -and $choice -lt $recentVideos.Count) {
-        $latestVideo = $recentVideos[$choice]
-        break
-    }
-}
-
+# --- Step 2: Select Video (file dialog, opens in user's Videos folder) ---
+$videosFolder = Join-Path $env:USERPROFILE "Videos"
+if (-not (Test-Path $videosFolder)) { $videosFolder = $videoSourceDir }
+$selectedPath = Show-FileSelector -InitialDirectory $videosFolder
+if (-not $selectedPath) { exit 0 }
+$latestVideo = Get-Item $selectedPath
 Write-Host "Selected: $($latestVideo.Name)" -ForegroundColor Green
 
 # --- Step 3: Wait for OBS to Stop Recording ---
