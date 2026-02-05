@@ -213,15 +213,52 @@ _DIALOG_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 14px; padding: 24px; margin: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    font-size: 14px;
+    padding: 24px;
+    margin: 0;
+    background: #1e1e1e;
+    color: #e0e0e0;
+  }
   .row { margin-bottom: 16px; }
-  label { display: inline-block; width: 90px; font-weight: bold; }
-  input[type="text"] { width: 280px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-  input[type="checkbox"] { margin-left: 8px; vertical-align: middle; }
+  label { display: inline-block; width: 90px; font-weight: bold; color: #e0e0e0; }
+  input[type="text"] {
+    width: 280px;
+    padding: 8px 10px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #3c3c3c;
+    color: #e0e0e0;
+  }
+  input[type="text"]::placeholder { color: #888; }
+  input[type="checkbox"] {
+    margin-left: 8px;
+    vertical-align: middle;
+    accent-color: #0e639c;
+  }
   .buttons { margin-top: 28px; padding-top: 16px; }
-  .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
-  .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
-  .buttons button:hover { opacity: 0.9; }
+  .buttons button {
+    padding: 12px 28px;
+    margin-left: 14px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1px solid #555;
+  }
+  .buttons button:first-of-type {
+    margin-left: 0;
+    background: #0e639c;
+    color: #fff;
+    border-color: #0e639c;
+  }
+  .buttons button:first-of-type:hover { background: #1177bb; }
+  .buttons button:last-of-type {
+    background: #3c3c3c;
+    color: #e0e0e0;
+  }
+  .buttons button:last-of-type:hover { background: #505050; }
 </style>
 </head>
 <body>
