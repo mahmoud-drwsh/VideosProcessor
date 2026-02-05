@@ -113,15 +113,20 @@ function Escape-HtmlForDialog {
     return $Text -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;' -replace '"', '&quot;'
 }
 
-# HTML dialog for title and artist (RTL, editable). Returns [PSCustomObject] with CleanTitle, AlbumArtist on OK; $null on Cancel.
+# HTML dialog for title and artist (RTL, editable). Returns [PSCustomObject] with CleanTitle, AlbumArtist, SkipAudio, SkipVideo on OK; $null on Cancel.
 function Show-TitleConfirmationDialog {
     param(
         [string]$TitleText,
-        [string]$ArtistText
+        [string]$ArtistText,
+        [switch]$InitialSkipAudio,
+        [switch]$InitialSkipVideo
     )
 
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
+
+    $skipAudioChecked = if ($InitialSkipAudio) { " checked" } else { "" }
+    $skipVideoChecked = if ($InitialSkipVideo) { " checked" } else { "" }
 
     $callbackSource = @'
 using System;
@@ -131,10 +136,14 @@ public class DialogResultCallback {
     public static bool? Result;
     public static string TitleResult;
     public static string ArtistResult;
-    public void Confirm(bool ok, object titleObj, object artistObj) {
+    public static bool SkipAudioResult;
+    public static bool SkipVideoResult;
+    public void Confirm(bool ok, object titleObj, object artistObj, bool skipAudio, bool skipVideo) {
         Result = ok;
         TitleResult = titleObj != null ? titleObj.ToString() : "";
         ArtistResult = artistObj != null ? artistObj.ToString() : "";
+        SkipAudioResult = skipAudio;
+        SkipVideoResult = skipVideo;
     }
 }
 '@
@@ -142,6 +151,8 @@ public class DialogResultCallback {
     [DialogResultCallback]::Result = $null
     [DialogResultCallback]::TitleResult = ""
     [DialogResultCallback]::ArtistResult = ""
+    [DialogResultCallback]::SkipAudioResult = $false
+    [DialogResultCallback]::SkipVideoResult = $false
 
     $titleEscaped = Escape-HtmlForDialog -Text $TitleText
     $artistEscaped = Escape-HtmlForDialog -Text $ArtistText
@@ -156,6 +167,7 @@ public class DialogResultCallback {
   .row { margin-bottom: 16px; }
   label { display: inline-block; width: 90px; font-weight: bold; }
   input[type="text"] { width: 280px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  input[type="checkbox"] { margin-left: 8px; vertical-align: middle; }
   .buttons { margin-top: 28px; padding-top: 16px; }
   .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
   .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
@@ -165,9 +177,11 @@ public class DialogResultCallback {
 <body>
   <div class="row"><label>العنوان:</label><input type="text" id="titleInput" value="$titleEscaped" dir="rtl"></div>
   <div class="row"><label>الفنان:</label><input type="text" id="artistInput" value="$artistEscaped" dir="rtl"></div>
+  <div class="row"><label>تخطي الصوت:</label><input type="checkbox" id="skipAudio"$skipAudioChecked></div>
+  <div class="row"><label>تخطي الفيديو:</label><input type="checkbox" id="skipVideo"$skipVideoChecked></div>
   <div class="buttons">
-    <button type="button" onclick="window.external.Confirm(true, document.getElementById('titleInput').value, document.getElementById('artistInput').value)">موافق</button>
-    <button type="button" onclick="window.external.Confirm(false, '', '')">إلغاء</button>
+    <button type="button" onclick="window.external.Confirm(true, document.getElementById('titleInput').value, document.getElementById('artistInput').value, document.getElementById('skipAudio').checked, document.getElementById('skipVideo').checked)">موافق</button>
+    <button type="button" onclick="window.external.Confirm(false, '', '', false, false)">إلغاء</button>
   </div>
 <script>
 window.initSelectOnFirstClick = function() {
@@ -197,7 +211,7 @@ window.initSelectOnFirstClick = function() {
     try {
         $form = New-Object System.Windows.Forms.Form
         $form.Text = "Confirm Title"
-        $form.Size = New-Object System.Drawing.Size(520, 260)
+        $form.Size = New-Object System.Drawing.Size(520, 320)
         $form.StartPosition = "CenterScreen"
         $form.FormBorderStyle = "FixedDialog"
 
@@ -239,6 +253,8 @@ window.initSelectOnFirstClick = function() {
             return [PSCustomObject]@{
                 CleanTitle  = $t.Trim()
                 AlbumArtist = $a.Trim()
+                SkipAudio   = [DialogResultCallback]::SkipAudioResult
+                SkipVideo   = [DialogResultCallback]::SkipVideoResult
             }
         }
         return $null
@@ -295,12 +311,16 @@ while ($true) {
             $cleanTitle = $validLines[0].Trim() # Line 1: Filename part
             $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
             Write-Host "Title file OK. Showing confirmation..." -ForegroundColor Cyan
-            $result = Show-TitleConfirmationDialog -TitleText $cleanTitle -ArtistText $albumArtist
+            $dialogParams = @{ TitleText = $cleanTitle; ArtistText = $albumArtist }
+            if ($skipAudio) { $dialogParams['InitialSkipAudio'] = $true }
+            $result = Show-TitleConfirmationDialog @dialogParams
             if (-not $result) {
                 exit 0
             }
             $cleanTitle = $result.CleanTitle
             $albumArtist = $result.AlbumArtist
+            $doSkipAudio = $result.SkipAudio -or $skipAudio
+            $doSkipVideo = $result.SkipVideo
             # Normalize leading date to YYYYMMDD (remove slashes) for consistency
             $cleanTitle = Normalize-LeadingDateInTitle -Text $cleanTitle
             # Overwrite title.txt with confirmed text so next run uses the same values
@@ -366,9 +386,9 @@ if (-not $debugProgram) {
 
 # --- Step 5: Process Files (NO OVERWRITE) ---
 
-# 5a. Extract Audio (skipped if -skipAudio)
-if ($skipAudio) {
-    Write-Host "  > Audio step skipped (-skipAudio)." -ForegroundColor DarkGray
+# 5a. Extract Audio (skipped if user chose skip audio)
+if ($doSkipAudio) {
+    Write-Host "  > Audio step skipped (user choice)." -ForegroundColor DarkGray
 } elseif (-not (Test-Path $audioOutPath)) {
     Write-Host "  > Extracting Audio..."
     $metaTitle = "الشيخ محمد فواز النمر"
@@ -380,16 +400,17 @@ if ($skipAudio) {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
-# 5b. Re-encode Video (H.265 libx265 480p)
-if (-not (Test-Path $videoOutPath)) {
+# 5b. Re-encode Video (H.265 libx265 480p) (skipped if user chose skip video)
+if ($doSkipVideo) {
+    Write-Host "  > Video re-encode skipped (user choice)." -ForegroundColor DarkGray
+} elseif (-not (Test-Path $videoOutPath)) {
     Write-Host "  > Re-encoding Video (H.265 libx265 480p)..."
     $metaTitle = "الشيخ محمد فواز النمر"
     $h265Args = Get-H265480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -metaTitle $metaTitle
     Write-Host "  > ffmpeg H.265 480p args:" -ForegroundColor Magenta
     Write-Host "    ffmpeg $h265Args"
     $null = Start-Process -FilePath "ffmpeg" -ArgumentList $h265Args -Wait -NoNewWindow -PassThru
-}
-else {
+} else {
     Write-Host "  > Compressed video already exists. Skipping." -ForegroundColor DarkGray
 }
 
@@ -398,9 +419,9 @@ if (-not $debugProgram) {
 
     # 6a. Original already copied in Step 4b (to work folder + final folder).
 
-    # 6b. Copy Audio (skipped if -skipAudio)
-    if ($skipAudio) {
-        Write-Host "  > Audio copy skipped (-skipAudio)." -ForegroundColor DarkGray
+    # 6b. Copy Audio (skipped if user chose skip audio)
+    if ($doSkipAudio) {
+        Write-Host "  > Audio copy skipped (user choice)." -ForegroundColor DarkGray
     } else {
         $finalAudioPath = Join-Path $destAudio "$baseName.opus"
         if (-not (Test-Path $finalAudioPath)) {
@@ -411,14 +432,17 @@ if (-not $debugProgram) {
         }
     }
 
-    # 6c. Copy Compressed Video
-    $finalCompPath = Join-Path $destCompVideo "$baseName.mp4"
-    if (-not (Test-Path $finalCompPath)) {
-        Write-Host "  > Copying Compressed Video..."
-        Copy-Item -Path $videoOutPath -Destination $finalCompPath
-    }
-    else {
-        Write-Host "  > Compressed video already in destination. Skipping." -ForegroundColor DarkGray
+    # 6c. Copy Compressed Video (skipped if user chose skip video)
+    if ($doSkipVideo) {
+        Write-Host "  > Compressed video copy skipped (user choice)." -ForegroundColor DarkGray
+    } else {
+        $finalCompPath = Join-Path $destCompVideo "$baseName.mp4"
+        if (-not (Test-Path $finalCompPath)) {
+            Write-Host "  > Copying Compressed Video..."
+            Copy-Item -Path $videoOutPath -Destination $finalCompPath
+        } else {
+            Write-Host "  > Compressed video already in destination. Skipping." -ForegroundColor DarkGray
+        }
     }
 
 }
