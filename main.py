@@ -81,15 +81,13 @@ def main(
 
     # Title
     tk.Label(root, text="Title:").grid(row=0, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=title_var, width=40).grid(
-        row=0, column=1, columnspan=2, sticky="w", padx=8, pady=6
-    )
+    title_entry = tk.Entry(root, textvariable=title_var, width=40)
+    title_entry.grid(row=0, column=1, columnspan=2, sticky="w", padx=8, pady=6)
 
     # Artist
     tk.Label(root, text="Artist:").grid(row=1, column=0, sticky="e", padx=8, pady=6)
-    tk.Entry(root, textvariable=artist_var, width=40).grid(
-        row=1, column=1, columnspan=2, sticky="w", padx=8, pady=6
-    )
+    artist_entry = tk.Entry(root, textvariable=artist_var, width=40)
+    artist_entry.grid(row=1, column=1, columnspan=2, sticky="w", padx=8, pady=6)
 
     # Checkboxes
     tk.Checkbutton(root, text="Skip audio", variable=skip_audio_var).grid(
@@ -146,9 +144,31 @@ def main(
         side="left", padx=5
     )
 
+    # Keyboard shortcuts: Enter/Escape, Ctrl+A, Ctrl+V in text fields.
+    #
     # Make Enter = OK, Escape = Cancel
     root.bind("<Return>", lambda _event: on_ok())
     root.bind("<Escape>", lambda _event: on_cancel())
+
+    def _select_all(event: tk.Event) -> str:
+        widget = event.widget
+        if isinstance(widget, tk.Entry):
+            widget.select_range(0, "end")
+            widget.icursor("end")
+        return "break"
+
+    def _paste_clipboard(event: tk.Event) -> str:
+        widget = event.widget
+        if isinstance(widget, tk.Entry):
+            widget.event_generate("<<Paste>>")
+        return "break"
+
+    # Apply standard Windows-like shortcuts to all Entry widgets.
+    for entry in (title_entry, artist_entry):
+        entry.bind("<Control-a>", _select_all)
+        entry.bind("<Control-A>", _select_all)
+        entry.bind("<Control-v>", _paste_clipboard)
+        entry.bind("<Control-V>", _paste_clipboard)
 
     root.mainloop()
 
