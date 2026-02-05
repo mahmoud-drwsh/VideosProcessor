@@ -98,9 +98,11 @@ def main(
     tk.Checkbutton(root, text="Skip video", variable=skip_video_var).grid(
         row=3, column=0, columnspan=3, sticky="w", padx=8
     )
-    tk.Checkbutton(root, text="Debug mode", variable=debug_var).grid(
-        row=4, column=0, columnspan=3, sticky="w", padx=8
-    )
+    # Only show the Debug checkbox when initial_debug was set via CLI.
+    if initial_debug:
+        tk.Checkbutton(root, text="Debug mode", variable=debug_var).grid(
+            row=4, column=0, columnspan=3, sticky="w", padx=8
+        )
 
     def on_ok() -> None:
         title = title_var.get().strip()
