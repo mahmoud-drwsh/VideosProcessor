@@ -12,6 +12,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
+import webview
+
 
 # --- Configuration (match main.ps1 paths) ---
 
@@ -29,6 +31,18 @@ def ensure_directories() -> None:
 
 
 # --- Helper functions (Python equivalents) ---
+
+def escape_html_for_dialog(text: str) -> str:
+    """Escape text for safe use in HTML (e.g. value="" attribute)."""
+    if not text:
+        return ""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
 
 def get_safe_filename(text: str) -> str:
     if not text:
@@ -192,71 +206,118 @@ def show_file_selector(initial_directory: Path | None = None) -> Path | None:
         root.destroy()
 
 
+# --- HTML title dialog (pywebview) ---
+
+_DIALOG_HTML = """<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 14px; padding: 24px; margin: 0; }
+  .row { margin-bottom: 16px; }
+  label { display: inline-block; width: 90px; font-weight: bold; }
+  input[type="text"] { width: 280px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+  input[type="checkbox"] { margin-left: 8px; vertical-align: middle; }
+  .buttons { margin-top: 28px; padding-top: 16px; }
+  .buttons button { padding: 12px 28px; margin-left: 14px; cursor: pointer; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
+  .buttons button:first-of-type { margin-left: 0; background: #0078d4; color: #fff; border-color: #0078d4; }
+  .buttons button:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+  <div class="row"><label>العنوان:</label><input type="text" id="titleInput" value="{{TITLE}}" dir="rtl"></div>
+  <div class="row"><label>الفنان:</label><input type="text" id="artistInput" value="{{ARTIST}}" dir="rtl"></div>
+  <div class="row"><label>تخطي الصوت:</label><input type="checkbox" id="skipAudio"{{SKIP_AUDIO_CHECKED}}></div>
+  <div class="row"><label>تخطي الفيديو:</label><input type="checkbox" id="skipVideo"{{SKIP_VIDEO_CHECKED}}></div>
+  <div class="buttons">
+    <button type="button" id="btnOk">موافق</button>
+    <button type="button" id="btnCancel">إلغاء</button>
+  </div>
+<script>
+window.addEventListener('pywebviewready', function() {
+  function submit() {
+    var title = document.getElementById('titleInput').value || '';
+    var artist = document.getElementById('artistInput').value || '';
+    var skipAudio = document.getElementById('skipAudio').checked;
+    var skipVideo = document.getElementById('skipVideo').checked;
+    pywebview.api.submit(title, artist, skipAudio, skipVideo);
+  }
+  function cancel() { pywebview.api.cancel(); }
+  document.getElementById('btnOk').onclick = submit;
+  document.getElementById('btnCancel').onclick = cancel;
+  var titleEl = document.getElementById('titleInput');
+  var artistEl = document.getElementById('artistInput');
+  var firstTime = { title: true, artist: true };
+  titleEl.onfocus = function() { if (firstTime.title) { firstTime.title = false; titleEl.select(); } };
+  titleEl.onmouseup = function() { if (firstTime.title) titleEl.select(); };
+  artistEl.onfocus = function() { if (firstTime.artist) { firstTime.artist = false; artistEl.select(); } };
+  artistEl.onmouseup = function() { if (firstTime.artist) artistEl.select(); };
+});
+</script>
+</body>
+</html>
+"""
+
+
+class _DialogAPI:
+    """Exposed to JS as pywebview.api. submit/cancel store result and close the window."""
+
+    def __init__(self) -> None:
+        self._window: webview.Window | None = None
+        self._result: dict | None = None
+
+    def set_window(self, window: webview.Window) -> None:
+        self._window = window
+
+    def submit(self, title: str, artist: str, skip_audio: bool, skip_video: bool) -> None:
+        self._result = {
+            "ok": True,
+            "title": (title or "").strip(),
+            "artist": (artist or "").strip(),
+            "skip_audio": bool(skip_audio),
+            "skip_video": bool(skip_video),
+        }
+        if self._window:
+            self._window.destroy()
+
+    def cancel(self) -> None:
+        self._result = {"ok": False}
+        if self._window:
+            self._window.destroy()
+
+    def get_result(self) -> dict | None:
+        return self._result
+
+
 def show_title_confirmation_dialog(
     title_text: str,
     artist_text: str,
     initial_skip_audio: bool = False,
     initial_skip_video: bool = False,
 ) -> dict | None:
-    root = tk.Tk()
-    root.title("Confirm Title")
-    root.geometry("520x320")
+    title_escaped = escape_html_for_dialog(title_text or "")
+    artist_escaped = escape_html_for_dialog(artist_text or "")
+    skip_audio_checked = " checked" if initial_skip_audio else ""
+    skip_video_checked = " checked" if initial_skip_video else ""
 
-    result: dict | None = None
+    html = (
+        _DIALOG_HTML.replace("{{TITLE}}", title_escaped)
+        .replace("{{ARTIST}}", artist_escaped)
+        .replace("{{SKIP_AUDIO_CHECKED}}", skip_audio_checked)
+        .replace("{{SKIP_VIDEO_CHECKED}}", skip_video_checked)
+    )
 
-    def on_ok() -> None:
-        nonlocal result
-        result = {
-            "ok": True,
-            "title": title_var.get().strip(),
-            "artist": artist_var.get().strip(),
-            "skip_audio": bool(skip_audio_var.get()),
-            "skip_video": bool(skip_video_var.get()),
-        }
-        root.destroy()
-
-    def on_cancel() -> None:
-        nonlocal result
-        result = {"ok": False}
-        root.destroy()
-
-    # RTL layout: column 0 = input (left), column 1 = label (right). Form packed from the right.
-    frame = tk.Frame(root, padx=24, pady=24)
-    frame.pack(side="right", fill="both", expand=True)
-
-    title_var = tk.StringVar(value=title_text or "")
-    artist_var = tk.StringVar(value=artist_text or "")
-    skip_audio_var = tk.IntVar(value=1 if initial_skip_audio else 0)
-    skip_video_var = tk.IntVar(value=1 if initial_skip_video else 0)
-
-    # Title row: input left, label right (RTL order)
-    tk.Entry(frame, textvariable=title_var, justify="right", width=40).grid(row=0, column=0, sticky="we", pady=4, padx=(0, 8))
-    tk.Label(frame, text="العنوان:", anchor="e", width=12).grid(row=0, column=1, sticky="e", pady=4)
-
-    # Artist row
-    tk.Entry(frame, textvariable=artist_var, justify="right", width=40).grid(row=1, column=0, sticky="we", pady=4, padx=(0, 8))
-    tk.Label(frame, text="الفنان:", anchor="e", width=12).grid(row=1, column=1, sticky="e", pady=4)
-
-    # Skip audio: checkbox left, label right
-    tk.Checkbutton(frame, variable=skip_audio_var).grid(row=2, column=0, sticky="w", pady=4, padx=(0, 8))
-    tk.Label(frame, text="تخطي الصوت:", anchor="e", width=12).grid(row=2, column=1, sticky="e", pady=4)
-
-    # Skip video
-    tk.Checkbutton(frame, variable=skip_video_var).grid(row=3, column=0, sticky="w", pady=4, padx=(0, 8))
-    tk.Label(frame, text="تخطي الفيديو:", anchor="e", width=12).grid(row=3, column=1, sticky="e", pady=4)
-
-    # Buttons: Cancel left, OK right (RTL: primary action on the right)
-    btn_frame = tk.Frame(frame, pady=16)
-    btn_frame.grid(row=4, column=0, columnspan=2, sticky="e")
-    ok_btn = tk.Button(btn_frame, text="موافق", width=12, command=on_ok)
-    cancel_btn = tk.Button(btn_frame, text="إلغاء", width=12, command=on_cancel)
-    cancel_btn.pack(side="right", padx=(8, 0))
-    ok_btn.pack(side="right")
-
-    frame.columnconfigure(0, weight=1)
-
-    root.mainloop()
-    return result
+    api = _DialogAPI()
+    window = webview.create_window(
+        "Confirm Title",
+        html=html,
+        js_api=api,
+        width=520,
+        height=320,
+    )
+    api.set_window(window)
+    webview.start()
+    return api.get_result()
 
 
 # --- Main workflow ---
