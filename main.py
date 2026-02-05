@@ -56,9 +56,9 @@ def run_powershell(
     if debug_program:
         cmd.append("-debugProgram")
 
-    # Let PowerShell write directly to the same console.
+    # Fire-and-forget: start PowerShell and return immediately so the GUI can close.
     try:
-        completed = subprocess.run(cmd, cwd=str(repo_root))
+        subprocess.Popen(cmd, cwd=str(repo_root))
     except FileNotFoundError:
         print(
             "Error: Could not find 'pwsh' on PATH. "
@@ -67,7 +67,7 @@ def run_powershell(
         )
         return 1
 
-    return completed.returncode
+    return 0
 
 
 def main(
@@ -157,34 +157,21 @@ def main(
                 )
                 return
 
+            # Close the GUI immediately, then start PowerShell in the background.
+            self.close()
+
             skip_audio = self.skip_audio_cb.isChecked()
             skip_video = self.skip_video_cb.isChecked()
             debug_program = bool(self.debug_cb and self.debug_cb.isChecked())
 
-            rc = run_powershell(
+            # Any errors (e.g. pwsh not found) are printed to stderr in the console.
+            run_powershell(
                 title=title,
                 artist=artist,
                 skip_audio=skip_audio,
                 skip_video=skip_video,
                 debug_program=debug_program,
             )
-
-            if rc == 0:
-                QMessageBox.information(
-                    self,
-                    "Done",
-                    "Processing completed successfully.",
-                    QMessageBox.Ok,
-                )
-            else:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"PowerShell script exited with code {rc}. See console output for details.",
-                    QMessageBox.Ok,
-                )
-
-            self.close()
 
         def keyPressEvent(self, event) -> None:  # type: ignore[override]
             if event.key() in (Qt.Key_Return, Qt.Key_Enter):
