@@ -4,7 +4,10 @@
 #>
 param(
     [switch]$debugProgram,
-    [switch]$skipAudio
+    [switch]$skipAudio,
+    [switch]$skipVideo,
+    [string]$Title,
+    [string]$Artist
 )
 # Set encoding to UTF8 to handle Arabic text correctly
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -298,39 +301,39 @@ function Test-IsFileLocked($filePath) {
 
 # --- Main Workflow ---
 
-# --- Step 1: Wait for Title File (Must have 2 lines) ---
-Write-Host "Checking Title file for 2 lines..." -ForegroundColor Cyan
-while ($true) {
-    if (Test-Path $titleFilePath) {
-        # Read file as an array of lines
-        $lines = Get-Content $titleFilePath -Encoding UTF8
-        # Filter out empty lines just in case
-        $validLines = $lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+# --- Step 1: Resolve Title and Artist (parameters or title.txt, no UI) ---
+Write-Host "Resolving title and artist..." -ForegroundColor Cyan
 
-        if ($validLines.Count -ge 2) {
-            $cleanTitle = $validLines[0].Trim() # Line 1: Filename part
-            $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
-            Write-Host "Title file OK. Showing confirmation..." -ForegroundColor Cyan
-            $dialogParams = @{ TitleText = $cleanTitle; ArtistText = $albumArtist }
-            if ($skipAudio) { $dialogParams['InitialSkipAudio'] = $true }
-            $result = Show-TitleConfirmationDialog @dialogParams
-            if (-not $result) {
-                exit 0
-            }
-            $cleanTitle = $result.CleanTitle
-            $albumArtist = $result.AlbumArtist
-            $doSkipAudio = $result.SkipAudio -or $skipAudio
-            $doSkipVideo = $result.SkipVideo
-            # Normalize leading date to YYYYMMDD (remove slashes) for consistency
-            $cleanTitle = Normalize-LeadingDateInTitle -Text $cleanTitle
-            # Overwrite title.txt with confirmed text so next run uses the same values
-            Set-Content -Path $titleFilePath -Value @($cleanTitle, $albumArtist) -Encoding UTF8
-            break # User confirmed (possibly edited), proceed
-        }
-    }
-    Write-Host "Waiting for 2 lines in $titleFilePath..." -ForegroundColor Yellow
-    Start-Sleep -Milliseconds 500
+$cleanTitle = $null
+$albumArtist = $null
+
+if ($Title -and $Artist) {
+    # Prefer explicit parameters when provided
+    $cleanTitle = $Title.Trim()
+    $albumArtist = $Artist.Trim()
 }
+elseif (Test-Path $titleFilePath) {
+    # Fallback: use existing title.txt file (2 non-empty lines: title, artist)
+    $lines = Get-Content $titleFilePath -Encoding UTF8
+    $validLines = $lines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+    if ($validLines.Count -ge 2) {
+        $cleanTitle = $validLines[0].Trim() # Line 1: Filename part
+        $albumArtist = $validLines[1].Trim() # Line 2: Metadata Artist
+    }
+}
+
+if (-not $cleanTitle -or -not $albumArtist) {
+    Write-Host "Title and Artist must be provided via -Title/-Artist parameters or in title.txt (first two non-empty lines)." -ForegroundColor Red
+    exit 1
+}
+
+# Normalize leading date to YYYYMMDD (remove slashes) for consistency
+$cleanTitle = Normalize-LeadingDateInTitle -Text $cleanTitle
+
+# Effective skip flags are now purely from CLI switches
+$doSkipAudio = [bool]$skipAudio
+$doSkipVideo = [bool]$skipVideo
 
 # --- Step 2: Select Video (file dialog, opens in user's Videos folder) ---
 $videosFolder = Join-Path $env:USERPROFILE "Videos"
