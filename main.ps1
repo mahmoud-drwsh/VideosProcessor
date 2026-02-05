@@ -30,8 +30,8 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
     return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    # H.265/HEVC 480p via libx265; CRF 24 = good quality, preset medium = balance of speed/size
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v libx265 -preset veryfast -crf 24 -r 25 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    # H.265/HEVC 480p via hevc_nvenc; CQ 24 = good quality, preset p4 = balance of speed/size
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v hevc_nvenc -preset p4 -cq 24 -r 25 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
@@ -400,11 +400,11 @@ if ($doSkipAudio) {
     Write-Host "  > Audio already exists. Skipping." -ForegroundColor DarkGray
 }
 
-# 5b. Re-encode Video (H.265 libx265 480p) (skipped if user chose skip video)
+# 5b. Re-encode Video (H.265 hevc_nvenc 480p) (skipped if user chose skip video)
 if ($doSkipVideo) {
     Write-Host "  > Video re-encode skipped (user choice)." -ForegroundColor DarkGray
 } elseif (-not (Test-Path $videoOutPath)) {
-    Write-Host "  > Re-encoding Video (H.265 libx265 480p)..."
+    Write-Host "  > Re-encoding Video (H.265 hevc_nvenc 480p)..."
     $metaTitle = "الشيخ محمد فواز النمر"
     $h265Args = Get-H265480EncodeArgs -inputPath $latestVideo.FullName -outputPath $videoOutPath -metaTitle $metaTitle
     Write-Host "  > ffmpeg H.265 480p args:" -ForegroundColor Magenta

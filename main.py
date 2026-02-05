@@ -147,7 +147,7 @@ def get_audio_encode_args(input_path: Path, output_path: Path, meta_title: str, 
 
 
 def get_h265480_encode_args(input_path: Path, output_path: Path, meta_title: str) -> list[str]:
-    # Mirrors Get-H265480EncodeArgs in main.ps1
+    # Mirrors Get-H265480EncodeArgs in main.ps1 (hevc_nvenc)
     return [
         "-y",
         "-i",
@@ -157,10 +157,10 @@ def get_h265480_encode_args(input_path: Path, output_path: Path, meta_title: str
         "-map_metadata",
         "-1",
         "-c:v",
-        "libx265",
+        "hevc_nvenc",
         "-preset",
-        "veryfast",
-        "-crf",
+        "p4",
+        "-cq",
         "24",
         "-r",
         "25",
@@ -488,7 +488,7 @@ def run(debug_program: bool, cli_skip_audio: bool) -> None:
     if do_skip_video:
         print("  > Video re-encode skipped (user choice).")
     elif not video_out_path.exists():
-        print("  > Re-encoding Video (H.265 libx265 480p)...")
+        print("  > Re-encoding Video (H.265 hevc_nvenc 480p)...")
         meta_title = "الشيخ محمد فواز النمر"
         h265_args = get_h265480_encode_args(latest_video, video_out_path, meta_title)
         print("  > ffmpeg H.265 480p args:")
