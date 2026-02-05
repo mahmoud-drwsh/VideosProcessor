@@ -110,11 +110,40 @@ def get_video_fps(file_path: Path) -> float | None:
 
 
 def is_file_locked(file_path: Path) -> bool:
-    """Return True if file appears locked (similar intent to Test-IsFileLocked)."""
+    """Return True if file appears locked (similar intent to Test-IsFileLocked).
+    On Windows, uses CreateFileW with share mode 0 to match PowerShell's FileShare.None
+    so that OBS (or any process) having the file open for write is detected as locked.
+    """
+    if sys.platform == "win32":
+        try:
+            kernel32 = __import__("ctypes").windll.kernel32  # type: ignore[attr-defined]
+            GENERIC_READ = 0x80000000
+            OPEN_EXISTING = 3
+            FILE_ATTRIBUTE_NORMAL = 0x80
+            INVALID_HANDLE_VALUE = 0xFFFFFFFF
+
+            path_str = str(file_path.resolve())
+            handle = kernel32.CreateFileW(
+                path_str,
+                GENERIC_READ,
+                0,  # dwShareMode = 0 (no sharing; fails if another process has the file)
+                None,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            if handle == -1 or handle == INVALID_HANDLE_VALUE:
+                return True
+            kernel32.CloseHandle(handle)
+            return False
+        except Exception:
+            pass  # fall through to open()-based check
+
     try:
-        # Try opening for read; if another process has an exclusive lock we should get an error.
         with open(file_path, "rb"):
             return False
+    except FileNotFoundError:
+        return False  # missing file: do not treat as locked so the rest of the flow fails clearly
     except OSError:
         return True
 
