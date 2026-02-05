@@ -344,13 +344,25 @@ def show_title_confirmation_dialog(
         .replace("{{SKIP_VIDEO_CHECKED}}", skip_video_checked)
     )
 
+    # Center window on screen (tk already used for file dialog)
+    _root = tk.Tk()
+    _root.withdraw()
+    _screen_w = _root.winfo_screenwidth()
+    _screen_h = _root.winfo_screenheight()
+    _root.destroy()
+    _w, _h = 560, 360
+    _x = max(0, (_screen_w - _w) // 2)
+    _y = max(0, (_screen_h - _h) // 2)
+
     api = _DialogAPI()
     window = webview.create_window(
         "Confirm Title",
         html=html,
         js_api=api,
-        width=520,
-        height=320,
+        width=_w,
+        height=_h,
+        x=_x,
+        y=_y,
     )
     api.set_window(window)
     webview.start()
