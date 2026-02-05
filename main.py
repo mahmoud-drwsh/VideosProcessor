@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
@@ -58,19 +59,25 @@ def run_powershell(
     return completed.returncode
 
 
-def main() -> None:
+def main(
+    initial_title: str | None = None,
+    initial_artist: str | None = None,
+    initial_skip_audio: bool = False,
+    initial_skip_video: bool = False,
+    initial_debug: bool = False,
+) -> None:
     root = tk.Tk()
     root.title("Video Processor")
 
     # Simple, compact layout
     root.resizable(False, False)
 
-    # String / boolean variables
-    title_var = tk.StringVar()
-    artist_var = tk.StringVar()
-    skip_audio_var = tk.BooleanVar(value=False)
-    skip_video_var = tk.BooleanVar(value=False)
-    debug_var = tk.BooleanVar(value=False)
+    # String / boolean variables (pre-filled from any CLI args)
+    title_var = tk.StringVar(value=initial_title or "")
+    artist_var = tk.StringVar(value=initial_artist or "")
+    skip_audio_var = tk.BooleanVar(value=bool(initial_skip_audio))
+    skip_video_var = tk.BooleanVar(value=bool(initial_skip_video))
+    debug_var = tk.BooleanVar(value=bool(initial_debug))
 
     # Title
     tk.Label(root, text="Title:").grid(row=0, column=0, sticky="e", padx=8, pady=6)
@@ -145,8 +152,47 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Always parse CLI args, but use them only to pre-fill the GUI.
+    parser = argparse.ArgumentParser(
+        description="Python launcher + GUI for main.ps1 (Video Processor).",
+        add_help=True,
+    )
+    parser.add_argument(
+        "-Title",
+        dest="Title",
+        help="Initial title to show in the GUI (also passed to main.ps1 if unchanged).",
+    )
+    parser.add_argument(
+        "-Artist",
+        dest="Artist",
+        help="Initial artist to show in the GUI (also passed to main.ps1 if unchanged).",
+    )
+    parser.add_argument(
+        "-skipAudio",
+        action="store_true",
+        help="Pre-check 'Skip audio' in the GUI (maps to -skipAudio).",
+    )
+    parser.add_argument(
+        "-skipVideo",
+        action="store_true",
+        help="Pre-check 'Skip video' in the GUI (maps to -skipVideo).",
+    )
+    parser.add_argument(
+        "-debugProgram",
+        action="store_true",
+        help="Pre-check 'Debug mode' in the GUI (maps to -debugProgram).",
+    )
+
+    args = parser.parse_args()
+
     try:
-        main()
+        main(
+            initial_title=args.Title,
+            initial_artist=args.Artist,
+            initial_skip_audio=args.skipAudio,
+            initial_skip_video=args.skipVideo,
+            initial_debug=args.debugProgram,
+        )
     except Exception as exc:  # pragma: no cover - last-resort error dialog
         messagebox.showerror("Unexpected error", str(exc))
         sys.exit(1)
