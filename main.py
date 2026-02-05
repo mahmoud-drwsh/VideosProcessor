@@ -185,10 +185,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Optionally pre-populate from a local title.txt (first two non-empty lines).
-    # This is independent from the Windows-side title.txt used by main.ps1.
+    # Optionally pre-populate from a Desktop title.txt (first two non-empty lines).
+    # Looks for ~/Desktop/title.txt (cross-platform home + Desktop).
     repo_root = Path(__file__).resolve().parent
-    title_file = repo_root / "title.txt"
+    desktop = Path.home() / "Desktop"
+    title_file = desktop / "title.txt"
     file_title: str | None = None
     file_artist: str | None = None
     if title_file.exists():
