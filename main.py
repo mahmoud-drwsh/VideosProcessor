@@ -155,20 +155,29 @@ def main(
         if isinstance(widget, tk.Entry):
             widget.select_range(0, "end")
             widget.icursor("end")
-        return "break"
+            return "break"
+        return ""
 
     def _paste_clipboard(event: tk.Event) -> str:
         widget = event.widget
         if isinstance(widget, tk.Entry):
-            widget.event_generate("<<Paste>>")
-        return "break"
+            try:
+                widget.event_generate("<<Paste>>")
+            except tk.TclError:
+                # Fallback: insert clipboard text manually
+                try:
+                    text = widget.clipboard_get()
+                    widget.insert("insert", text)
+                except tk.TclError:
+                    pass
+            return "break"
+        return ""
 
-    # Apply standard Windows-like shortcuts to all Entry widgets.
-    for entry in (title_entry, artist_entry):
-        entry.bind("<Control-a>", _select_all)
-        entry.bind("<Control-A>", _select_all)
-        entry.bind("<Control-v>", _paste_clipboard)
-        entry.bind("<Control-V>", _paste_clipboard)
+    # Apply standard Windows-like shortcuts application-wide for all Entry widgets.
+    for seq in ("<Control-a>", "<Control-A>"):
+        root.bind_all(seq, _select_all, add="+")
+    for seq in ("<Control-v>", "<Control-V>"):
+        root.bind_all(seq, _paste_clipboard, add="+")
 
     root.mainloop()
 
