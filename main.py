@@ -220,32 +220,32 @@ def show_title_confirmation_dialog(
         result = {"ok": False}
         root.destroy()
 
-    # Simple RTL-friendly layout: right-aligned labels and entries.
+    # RTL layout: column 0 = input (left), column 1 = label (right). Form packed from the right.
     frame = tk.Frame(root, padx=24, pady=24)
-    frame.pack(fill="both", expand=True)
+    frame.pack(side="right", fill="both", expand=True)
 
     title_var = tk.StringVar(value=title_text or "")
     artist_var = tk.StringVar(value=artist_text or "")
     skip_audio_var = tk.IntVar(value=1 if initial_skip_audio else 0)
     skip_video_var = tk.IntVar(value=1 if initial_skip_video else 0)
 
-    # Title row
-    tk.Label(frame, text="العنوان:", anchor="e", width=12).grid(row=0, column=0, sticky="e", pady=4, padx=(0, 8))
-    tk.Entry(frame, textvariable=title_var, justify="right", width=40).grid(row=0, column=1, sticky="we", pady=4)
+    # Title row: input left, label right (RTL order)
+    tk.Entry(frame, textvariable=title_var, justify="right", width=40).grid(row=0, column=0, sticky="we", pady=4, padx=(0, 8))
+    tk.Label(frame, text="العنوان:", anchor="e", width=12).grid(row=0, column=1, sticky="e", pady=4)
 
     # Artist row
-    tk.Label(frame, text="الفنان:", anchor="e", width=12).grid(row=1, column=0, sticky="e", pady=4, padx=(0, 8))
-    tk.Entry(frame, textvariable=artist_var, justify="right", width=40).grid(row=1, column=1, sticky="we", pady=4)
+    tk.Entry(frame, textvariable=artist_var, justify="right", width=40).grid(row=1, column=0, sticky="we", pady=4, padx=(0, 8))
+    tk.Label(frame, text="الفنان:", anchor="e", width=12).grid(row=1, column=1, sticky="e", pady=4)
 
-    # Skip audio checkbox
-    tk.Label(frame, text="تخطي الصوت:", anchor="e", width=12).grid(row=2, column=0, sticky="e", pady=4, padx=(0, 8))
-    tk.Checkbutton(frame, variable=skip_audio_var).grid(row=2, column=1, sticky="w", pady=4)
+    # Skip audio: checkbox left, label right
+    tk.Checkbutton(frame, variable=skip_audio_var).grid(row=2, column=0, sticky="w", pady=4, padx=(0, 8))
+    tk.Label(frame, text="تخطي الصوت:", anchor="e", width=12).grid(row=2, column=1, sticky="e", pady=4)
 
-    # Skip video checkbox
-    tk.Label(frame, text="تخطي الفيديو:", anchor="e", width=12).grid(row=3, column=0, sticky="e", pady=4, padx=(0, 8))
-    tk.Checkbutton(frame, variable=skip_video_var).grid(row=3, column=1, sticky="w", pady=4)
+    # Skip video
+    tk.Checkbutton(frame, variable=skip_video_var).grid(row=3, column=0, sticky="w", pady=4, padx=(0, 8))
+    tk.Label(frame, text="تخطي الفيديو:", anchor="e", width=12).grid(row=3, column=1, sticky="e", pady=4)
 
-    # Buttons
+    # Buttons: Cancel left, OK right (RTL: primary action on the right)
     btn_frame = tk.Frame(frame, pady=16)
     btn_frame.grid(row=4, column=0, columnspan=2, sticky="e")
     ok_btn = tk.Button(btn_frame, text="موافق", width=12, command=on_ok)
@@ -253,7 +253,7 @@ def show_title_confirmation_dialog(
     cancel_btn.pack(side="right", padx=(8, 0))
     ok_btn.pack(side="right")
 
-    frame.columnconfigure(1, weight=1)
+    frame.columnconfigure(0, weight=1)
 
     root.mainloop()
     return result
