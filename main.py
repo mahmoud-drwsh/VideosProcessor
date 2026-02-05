@@ -4,8 +4,19 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
-import tkinter as tk
-from tkinter import messagebox
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QLabel,
+    QLineEdit,
+    QCheckBox,
+    QPushButton,
+    QHBoxLayout,
+    QVBoxLayout,
+    QMessageBox,
+)
 
 
 def run_powershell(
@@ -23,7 +34,7 @@ def run_powershell(
     ps1_path = repo_root / "main.ps1"
 
     if not ps1_path.exists():
-        messagebox.showerror("Error", f"Could not find PowerShell script:\n{ps1_path}")
+        print(f"Error: Could not find PowerShell script: {ps1_path}", file=sys.stderr)
         return 1
 
     cmd: list[str] = [
@@ -49,10 +60,10 @@ def run_powershell(
     try:
         completed = subprocess.run(cmd, cwd=str(repo_root))
     except FileNotFoundError:
-        messagebox.showerror(
-            "Error",
-            "Could not find 'pwsh' on PATH.\n"
+        print(
+            "Error: Could not find 'pwsh' on PATH. "
             "Make sure PowerShell 7+ is installed and 'pwsh' is available.",
+            file=sys.stderr,
         )
         return 1
 
@@ -66,123 +77,128 @@ def main(
     initial_skip_video: bool = False,
     initial_debug: bool = False,
 ) -> None:
-    root = tk.Tk()
-    root.title("Video Processor")
+    """
+    Launch a Qt-based dialog to collect title/artist and skip flags,
+    then invoke the PowerShell script.
+    """
 
-    # Simple, compact layout
-    root.resizable(False, False)
+    app = QApplication.instance() or QApplication(sys.argv)
 
-    # String / boolean variables (pre-filled from any CLI args)
-    title_var = tk.StringVar(value=initial_title or "")
-    artist_var = tk.StringVar(value=initial_artist or "")
-    skip_audio_var = tk.BooleanVar(value=bool(initial_skip_audio))
-    skip_video_var = tk.BooleanVar(value=bool(initial_skip_video))
-    debug_var = tk.BooleanVar(value=bool(initial_debug))
+    class MainWindow(QWidget):
+        def __init__(self) -> None:
+            super().__init__()
+            self.setWindowTitle("Video Processor")
 
-    # Title
-    tk.Label(root, text="Title:").grid(row=0, column=0, sticky="e", padx=8, pady=6)
-    title_entry = tk.Entry(root, textvariable=title_var, width=40)
-    title_entry.grid(row=0, column=1, columnspan=2, sticky="w", padx=8, pady=6)
+            # Widgets
+            self.title_edit = QLineEdit(self)
+            self.artist_edit = QLineEdit(self)
 
-    # Artist
-    tk.Label(root, text="Artist:").grid(row=1, column=0, sticky="e", padx=8, pady=6)
-    artist_entry = tk.Entry(root, textvariable=artist_var, width=40)
-    artist_entry.grid(row=1, column=1, columnspan=2, sticky="w", padx=8, pady=6)
+            if initial_title:
+                self.title_edit.setText(initial_title)
+            if initial_artist:
+                self.artist_edit.setText(initial_artist)
 
-    # Checkboxes
-    tk.Checkbutton(root, text="Skip audio", variable=skip_audio_var).grid(
-        row=2, column=0, columnspan=3, sticky="w", padx=8
-    )
-    tk.Checkbutton(root, text="Skip video", variable=skip_video_var).grid(
-        row=3, column=0, columnspan=3, sticky="w", padx=8
-    )
-    # Only show the Debug checkbox when initial_debug was set via CLI.
-    if initial_debug:
-        tk.Checkbutton(root, text="Debug mode", variable=debug_var).grid(
-            row=4, column=0, columnspan=3, sticky="w", padx=8
-        )
+            self.skip_audio_cb = QCheckBox("Skip audio", self)
+            self.skip_audio_cb.setChecked(bool(initial_skip_audio))
 
-    def on_ok() -> None:
-        title = title_var.get().strip()
-        artist = artist_var.get().strip()
+            self.skip_video_cb = QCheckBox("Skip video", self)
+            self.skip_video_cb.setChecked(bool(initial_skip_video))
 
-        if not title or not artist:
-            messagebox.showwarning(
-                "Missing data",
-                "Both Title and Artist must be filled in.",
+            self.debug_cb: QCheckBox | None = None
+            if initial_debug:
+                self.debug_cb = QCheckBox("Debug mode", self)
+                self.debug_cb.setChecked(True)
+
+            ok_btn = QPushButton("OK", self)
+            cancel_btn = QPushButton("Cancel", self)
+
+            ok_btn.clicked.connect(self.on_ok)  # type: ignore[arg-type]
+            cancel_btn.clicked.connect(self.close)  # type: ignore[arg-type]
+
+            # Layout
+            form_layout = QVBoxLayout()
+
+            title_row = QHBoxLayout()
+            title_row.addWidget(QLabel("Title:", self))
+            title_row.addWidget(self.title_edit)
+            form_layout.addLayout(title_row)
+
+            artist_row = QHBoxLayout()
+            artist_row.addWidget(QLabel("Artist:", self))
+            artist_row.addWidget(self.artist_edit)
+            form_layout.addLayout(artist_row)
+
+            form_layout.addWidget(self.skip_audio_cb)
+            form_layout.addWidget(self.skip_video_cb)
+            if self.debug_cb is not None:
+                form_layout.addWidget(self.debug_cb)
+
+            buttons_row = QHBoxLayout()
+            buttons_row.addStretch(1)
+            buttons_row.addWidget(ok_btn)
+            buttons_row.addWidget(cancel_btn)
+
+            main_layout = QVBoxLayout(self)
+            main_layout.addLayout(form_layout)
+            main_layout.addLayout(buttons_row)
+
+            self.setLayout(main_layout)
+
+        def on_ok(self) -> None:
+            title = self.title_edit.text().strip()
+            artist = self.artist_edit.text().strip()
+
+            if not title or not artist:
+                QMessageBox.warning(
+                    self,
+                    "Missing data",
+                    "Both Title and Artist must be filled in.",
+                    QMessageBox.Ok,
+                )
+                return
+
+            skip_audio = self.skip_audio_cb.isChecked()
+            skip_video = self.skip_video_cb.isChecked()
+            debug_program = bool(self.debug_cb and self.debug_cb.isChecked())
+
+            rc = run_powershell(
+                title=title,
+                artist=artist,
+                skip_audio=skip_audio,
+                skip_video=skip_video,
+                debug_program=debug_program,
             )
-            return
 
-        root.withdraw()  # Hide window while PowerShell runs
-        rc = run_powershell(
-            title=title,
-            artist=artist,
-            skip_audio=skip_audio_var.get(),
-            skip_video=skip_video_var.get(),
-            debug_program=debug_var.get(),
-        )
-        if rc == 0:
-            messagebox.showinfo("Done", "Processing completed successfully.")
-        else:
-            messagebox.showerror(
-                "Error",
-                f"PowerShell script exited with code {rc}. See console output for details.",
-            )
-        root.destroy()
+            if rc == 0:
+                QMessageBox.information(
+                    self,
+                    "Done",
+                    "Processing completed successfully.",
+                    QMessageBox.Ok,
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"PowerShell script exited with code {rc}. See console output for details.",
+                    QMessageBox.Ok,
+                )
 
-    def on_cancel() -> None:
-        root.destroy()
+            self.close()
 
-    # Buttons
-    button_frame = tk.Frame(root)
-    button_frame.grid(row=5, column=0, columnspan=3, pady=10)
+        def keyPressEvent(self, event) -> None:  # type: ignore[override]
+            if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                self.on_ok()
+                return
+            if event.key() == Qt.Key_Escape:
+                self.close()
+                return
+            super().keyPressEvent(event)
 
-    tk.Button(button_frame, text="OK", width=10, command=on_ok).pack(
-        side="left", padx=5
-    )
-    tk.Button(button_frame, text="Cancel", width=10, command=on_cancel).pack(
-        side="left", padx=5
-    )
-
-    # Keyboard shortcuts: Enter/Escape, Ctrl+A, Ctrl+V in text fields.
-    #
-    # Make Enter = OK, Escape = Cancel
-    root.bind("<Return>", lambda _event: on_ok())
-    root.bind("<Escape>", lambda _event: on_cancel())
-
-    def _select_all(event: tk.Event) -> str:
-        widget = event.widget
-        if isinstance(widget, tk.Entry):
-            widget.select_range(0, "end")
-            widget.icursor("end")
-            return "break"
-        return ""
-
-    def _paste_clipboard(event: tk.Event) -> str:
-        widget = event.widget
-        if not isinstance(widget, tk.Entry):
-            return ""
-        try:
-            text = widget.clipboard_get()
-        except tk.TclError:
-            return "break"
-
-        # replace selection if present, otherwise insert at cursor
-        try:
-            if widget.selection_present():
-                widget.delete("sel.first", "sel.last")
-            widget.insert("insert", text)
-        except tk.TclError:
-            pass
-        return "break"
-
-    # Bind to Entry *class* so only Entry widgets receive these handlers.
-    for seq in ("<Control-a>", "<Control-A>"):
-        root.bind_class("Entry", seq, _select_all, add="+")
-    for seq in ("<Control-v>", "<Control-V>"):
-        root.bind_class("Entry", seq, _paste_clipboard, add="+")
-
-    root.mainloop()
+    window = MainWindow()
+    window.resize(480, 160)
+    window.show()
+    app.exec()
 
 
 if __name__ == "__main__":
