@@ -160,24 +160,27 @@ def main(
 
     def _paste_clipboard(event: tk.Event) -> str:
         widget = event.widget
-        if isinstance(widget, tk.Entry):
-            try:
-                widget.event_generate("<<Paste>>")
-            except tk.TclError:
-                # Fallback: insert clipboard text manually
-                try:
-                    text = widget.clipboard_get()
-                    widget.insert("insert", text)
-                except tk.TclError:
-                    pass
+        if not isinstance(widget, tk.Entry):
+            return ""
+        try:
+            text = widget.clipboard_get()
+        except tk.TclError:
             return "break"
-        return ""
 
-    # Apply standard Windows-like shortcuts application-wide for all Entry widgets.
+        # replace selection if present, otherwise insert at cursor
+        try:
+            if widget.selection_present():
+                widget.delete("sel.first", "sel.last")
+            widget.insert("insert", text)
+        except tk.TclError:
+            pass
+        return "break"
+
+    # Bind to Entry *class* so only Entry widgets receive these handlers.
     for seq in ("<Control-a>", "<Control-A>"):
-        root.bind_all(seq, _select_all, add="+")
+        root.bind_class("Entry", seq, _select_all, add="+")
     for seq in ("<Control-v>", "<Control-V>"):
-        root.bind_all(seq, _paste_clipboard, add="+")
+        root.bind_class("Entry", seq, _paste_clipboard, add="+")
 
     root.mainloop()
 
