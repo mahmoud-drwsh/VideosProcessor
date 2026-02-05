@@ -185,10 +185,31 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Optionally pre-populate from a local title.txt (first two non-empty lines).
+    # This is independent from the Windows-side title.txt used by main.ps1.
+    repo_root = Path(__file__).resolve().parent
+    title_file = repo_root / "title.txt"
+    file_title: str | None = None
+    file_artist: str | None = None
+    if title_file.exists():
+        try:
+            lines = [line.strip() for line in title_file.read_text(encoding="utf-8").splitlines()]
+            valid = [ln for ln in lines if ln]
+            if len(valid) >= 2:
+                file_title = valid[0]
+                file_artist = valid[1]
+        except Exception:
+            # If anything goes wrong reading/parsing, just ignore and fall back to args only.
+            pass
+
+    # CLI args win over title.txt; title.txt is only used when args are missing.
+    initial_title = args.Title or file_title
+    initial_artist = args.Artist or file_artist
+
     try:
         main(
-            initial_title=args.Title,
-            initial_artist=args.Artist,
+            initial_title=initial_title,
+            initial_artist=initial_artist,
             initial_skip_audio=args.skipAudio,
             initial_skip_video=args.skipVideo,
             initial_debug=args.debugProgram,
