@@ -10,33 +10,9 @@ from datetime import datetime
 from pathlib import Path
 
 import tkinter as tk
+from tkinter import filedialog
 
 import webview
-
-# .NET OpenFileDialog (same as main.ps1) - Windows only
-def _init_winforms() -> None:
-    import clr
-    clr.AddReference("System.Windows.Forms")
-
-
-def show_file_selector(initial_directory: Path | None = None) -> Path | None:
-    """Show the same native Windows Open File dialog as main.ps1 (System.Windows.Forms.OpenFileDialog)."""
-    _init_winforms()
-    from System.Windows.Forms import OpenFileDialog, DialogResult  # noqa: E402
-
-    dialog = OpenFileDialog()
-    dialog.Title = "Select a Video File"
-    dialog.Filter = "Video Files|*.mp4;*.mkv;*.mov;*.avi;*.flv;*.obs|All Files|*.*"
-    dialog.Multiselect = False
-
-    if initial_directory and initial_directory.exists():
-        dialog.InitialDirectory = str(initial_directory)
-    else:
-        dialog.InitialDirectory = os.path.join(os.environ.get("USERPROFILE", ""), "Videos")
-
-    if dialog.ShowDialog() == DialogResult.OK:
-        return Path(dialog.FileName)
-    return None
 
 
 # --- Configuration (match main.ps1 paths) ---
@@ -202,14 +178,32 @@ def get_h265480_encode_args(input_path: Path, output_path: Path, meta_title: str
 
 # --- GUI dialogs (tkinter) ---
 
-def _screen_size() -> tuple[int, int]:
-    """Return (width, height) of the primary screen (for centering the title dialog)."""
+def _init_tk_root() -> tk.Tk:
     root = tk.Tk()
+    # We mostly use it for dialogs; no default root window UI.
     root.withdraw()
-    w = root.winfo_screenwidth()
-    h = root.winfo_screenheight()
-    root.destroy()
-    return w, h
+    return root
+
+
+def show_file_selector(initial_directory: Path | None = None) -> Path | None:
+    root = _init_tk_root()
+    try:
+        initialdir = str(initial_directory) if initial_directory and initial_directory.exists() else os.path.join(
+            os.environ.get("USERPROFILE", ""), "Videos"
+        )
+        file_path = filedialog.askopenfilename(
+            title="Select a Video File",
+            initialdir=initialdir,
+            filetypes=(
+                ("Video Files", "*.mp4 *.mkv *.mov *.avi *.flv *.obs"),
+                ("All Files", "*.*"),
+            ),
+        )
+        if not file_path:
+            return None
+        return Path(file_path)
+    finally:
+        root.destroy()
 
 
 # --- HTML title dialog (pywebview) ---
@@ -350,8 +344,12 @@ def show_title_confirmation_dialog(
         .replace("{{SKIP_VIDEO_CHECKED}}", skip_video_checked)
     )
 
-    # Center window on screen
-    _screen_w, _screen_h = _screen_size()
+    # Center window on screen (tk already used for file dialog)
+    _root = tk.Tk()
+    _root.withdraw()
+    _screen_w = _root.winfo_screenwidth()
+    _screen_h = _root.winfo_screenheight()
+    _root.destroy()
     _w, _h = 560, 440
     _x = max(0, (_screen_w - _w) // 2)
     _y = max(0, (_screen_h - _h) // 2)
