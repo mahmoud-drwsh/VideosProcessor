@@ -350,7 +350,7 @@ def show_title_confirmation_dialog(
     _screen_w = _root.winfo_screenwidth()
     _screen_h = _root.winfo_screenheight()
     _root.destroy()
-    _w, _h = 560, 360
+    _w, _h = 560, 440
     _x = max(0, (_screen_w - _w) // 2)
     _y = max(0, (_screen_h - _h) // 2)
 
