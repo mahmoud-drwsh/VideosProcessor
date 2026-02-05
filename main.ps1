@@ -132,7 +132,7 @@ function Show-TitleConfirmationDialog {
 using System;
 using System.Runtime.InteropServices;
 [ComVisible(true)]
-public class DialogResultCallback {
+public class DialogResultCallbackV2 {
     public static bool? Result;
     public static string TitleResult;
     public static string ArtistResult;
@@ -148,11 +148,11 @@ public class DialogResultCallback {
 }
 '@
     try { Add-Type -TypeDefinition $callbackSource } catch { }
-    [DialogResultCallback]::Result = $null
-    [DialogResultCallback]::TitleResult = ""
-    [DialogResultCallback]::ArtistResult = ""
-    [DialogResultCallback]::SkipAudioResult = $false
-    [DialogResultCallback]::SkipVideoResult = $false
+    [DialogResultCallbackV2]::Result = $null
+    [DialogResultCallbackV2]::TitleResult = ""
+    [DialogResultCallbackV2]::ArtistResult = ""
+    [DialogResultCallbackV2]::SkipAudioResult = $false
+    [DialogResultCallbackV2]::SkipVideoResult = $false
 
     $titleEscaped = Escape-HtmlForDialog -Text $TitleText
     $artistEscaped = Escape-HtmlForDialog -Text $ArtistText
@@ -221,13 +221,13 @@ window.initSelectOnFirstClick = function() {
         $browser.IsWebBrowserContextMenuEnabled = $false
         $form.Controls.Add($browser)
 
-        $callback = New-Object DialogResultCallback
+        $callback = New-Object DialogResultCallbackV2
         $browser.ObjectForScripting = $callback
 
         $timer = New-Object System.Windows.Forms.Timer
         $timer.Interval = 150
         $timer.Add_Tick({
-                if ([DialogResultCallback]::Result -ne $null) {
+                if ([DialogResultCallbackV2]::Result -ne $null) {
                     $timer.Stop()
                     $form.Close()
                 }
@@ -247,14 +247,14 @@ window.initSelectOnFirstClick = function() {
         $browser.Navigate($fileUri.AbsoluteUri)
         $null = $form.ShowDialog()
 
-        if ([DialogResultCallback]::Result -eq $true) {
-            $t = [DialogResultCallback]::TitleResult; if (-not $t) { $t = "" }
-            $a = [DialogResultCallback]::ArtistResult; if (-not $a) { $a = "" }
+        if ([DialogResultCallbackV2]::Result -eq $true) {
+            $t = [DialogResultCallbackV2]::TitleResult; if (-not $t) { $t = "" }
+            $a = [DialogResultCallbackV2]::ArtistResult; if (-not $a) { $a = "" }
             return [PSCustomObject]@{
                 CleanTitle  = $t.Trim()
                 AlbumArtist = $a.Trim()
-                SkipAudio   = [DialogResultCallback]::SkipAudioResult
-                SkipVideo   = [DialogResultCallback]::SkipVideoResult
+                SkipAudio   = [DialogResultCallbackV2]::SkipAudioResult
+                SkipVideo   = [DialogResultCallbackV2]::SkipVideoResult
             }
         }
         return $null
