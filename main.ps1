@@ -33,8 +33,7 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
     return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    # H.265/HEVC 480p via hevc_nvenc; CQ 24 = good quality, preset p4 = balance of speed/size
-    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v hevc_nvenc -preset p4 -cq 24 -r 25 -c:a copy -c:s copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -i `"$inputPath`" -vf `"scale=-2:480`" -map_metadata -1 -c:v hevc_nvenc -r 25 -c:a copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
