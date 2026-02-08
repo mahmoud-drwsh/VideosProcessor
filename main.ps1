@@ -12,6 +12,15 @@ param(
 # Set encoding to UTF8 to handle Arabic text correctly
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+# Set PowerShell console window width to 512 columns
+try {
+    $ws = $Host.UI.RawUI.WindowSize
+    $ws.Width = 512
+    $bs = $Host.UI.RawUI.BufferSize
+    if ($bs.Width -lt 512) { $bs.Width = 512; $Host.UI.RawUI.BufferSize = $bs }
+    $Host.UI.RawUI.WindowSize = $ws
+} catch { }
+
 # --- Global variables (paths and config used throughout the script) ---
 $videoSourceDir = "C:\Users\LEGION\Videos"
 $titleFilePath  = "C:\Users\LEGION\Desktop\title.txt"
