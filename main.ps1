@@ -33,7 +33,7 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
     return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    return "-y -fps_mode passthrough -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -vf `"scale_cuda=-2:480`" -map_metadata -1 -c:v hevc_nvenc -preset p7 -c:a copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -fps_mode passthrough -vf `"scale_cuda=-2:480`" -map_metadata -1 -c:v hevc_nvenc -preset p7 -c:a copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
