@@ -30,10 +30,10 @@ if (-not (Test-Path $destAudio)) { New-Item -ItemType Directory -Path $destAudio
 
 function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) {
     # -map 0:a:0 = use only first audio stream (video is never decoded); -application voip = tuned for speech/lectures
-    return "-y -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -hide_banner -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    return "-y -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -fps_mode passthrough -vf `"scale_cuda=-2:480:interp_algo=lanczos`" -spatial_aq 1 -temporal_aq 1 -rc-lookahead 32 -map_metadata -1 -c:v hevc_nvenc -rc constqp -qp 25 -preset p7 -c:a copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
+    return "-y -hide_banner -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -fps_mode passthrough -vf `"scale_cuda=-2:480:interp_algo=lanczos`" -spatial_aq 1 -temporal_aq 1 -rc-lookahead 32 -map_metadata -1 -c:v hevc_nvenc -rc constqp -qp 23 -preset p7 -c:a copy -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 
 # --- Helper Functions ---
