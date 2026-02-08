@@ -454,4 +454,4 @@ else {
 
 # --- Final Step: Exit ---
 Write-Host "All tasks completed successfully. Exiting." -ForegroundColor Green
-Start-Sleep -Seconds 5
+Start-Sleep -Seconds 1
