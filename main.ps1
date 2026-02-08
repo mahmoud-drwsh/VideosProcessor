@@ -222,7 +222,7 @@ window.initSelectOnFirstClick = function() {
     try {
         $form = New-Object System.Windows.Forms.Form
         $form.Text = "Confirm Title"
-        $form.Size = New-Object System.Drawing.Size(520, 320)
+        $form.Size = New-Object System.Drawing.Size(560, 320)
         $form.StartPosition = "CenterScreen"
         $form.FormBorderStyle = "FixedDialog"
 
