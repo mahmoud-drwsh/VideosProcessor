@@ -22,7 +22,7 @@ try {
 } catch { }
 
 # --- Global variables (paths and config used throughout the script) ---
-$videoSourceDir = "C:\Users\LEGION\Videos"
+$videoSourceDir = "D:\00 - Videos\"
 $titleFilePath  = "C:\Users\LEGION\Desktop\title.txt"
 $workDir        = "C:\Users\LEGION\Desktop\إخراج"
 $destOrigVideo  = "D:\01 - الفيديو"
@@ -344,9 +344,9 @@ $doSkipAudio = [bool]$skipAudio
 $doSkipVideo = [bool]$skipVideo
 
 # --- Step 2: Select Video (file dialog, opens in user's Videos folder) ---
-$videosFolder = Join-Path $env:USERPROFILE "Videos"
-if (-not (Test-Path $videosFolder)) { $videosFolder = $videoSourceDir }
-$selectedPath = Show-FileSelector -InitialDirectory $videosFolder
+# $videosFolder = Join-Path $env:USERPROFILE "Videos"
+# if (-not (Test-Path $videosFolder)) { $videosFolder = $videoSourceDir }
+$selectedPath = Show-FileSelector -InitialDirectory $videoSourceDir
 if (-not $selectedPath) { exit 0 }
 $latestVideo = Get-Item $selectedPath
 Write-Host "Selected: $($latestVideo.Name)" -ForegroundColor Green
