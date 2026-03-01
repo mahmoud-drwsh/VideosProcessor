@@ -42,7 +42,7 @@ function Get-AudioEncodeArgs($inputPath, $outputPath, $metaTitle, $albumArtist) 
     return "-y -hide_banner -i `"$inputPath`" -map 0:a:0 -vn -c:a libopus -application voip -b:a 18k -map_metadata -1 -metadata title=`"$metaTitle`" -metadata album_artist=`"$albumArtist`" -metadata:s:a:0 title=`"$metaTitle`" `"$outputPath`""
 }
 function Get-H265480EncodeArgs($inputPath, $outputPath, $metaTitle) {
-    return "-y -hide_banner -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -fps_mode passthrough -vf `"scale_cuda=-2:480:interp_algo=lanczos,hwdownload,format=yuv420p`" -spatial_aq 1 -temporal_aq 1 -rc-lookahead 32 -map_metadata -1 -c:v hevc_nvenc -rc constqp -qp 23 -preset p7 -pix_fmt yuv420p -tag:v hvc1 -c:a aac -b:a 128k -ar 48000 -ac 2 -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" -movflags +faststart `"$outputPath`""
+    return "-y -hide_banner -hwaccel cuda -hwaccel_output_format cuda -i `"$inputPath`" -fps_mode passthrough -vf `"scale_cuda=-2:480:interp_algo=lanczos`" -spatial_aq 1 -temporal_aq 1 -rc-lookahead 32 -map_metadata -1 -c:v hevc_nvenc -rc constqp -qp 23 -preset p7 -tag:v hvc1 -c:a aac -b:a 128k -ar 48000 -ac 2 -map_chapters 0 -metadata:s:a:0 title=`"$metaTitle`" -movflags +faststart `"$outputPath`""
 }
 
 # --- Helper Functions ---
